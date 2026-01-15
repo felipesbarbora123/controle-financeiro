@@ -1,0 +1,47 @@
+const { Pool } = require('pg');
+const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+
+// Carregar .env do diretório backend
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'controle_financeiro',
+  password: process.env.DB_PASSWORD || 'postgres',
+  port: process.env.DB_PORT || 5432,
+});
+
+async function migrate() {
+  try {
+    console.log('Iniciando migrações...');
+    
+    // List of migrations to run
+    const migrations = [
+      '001_create_gastos_table.sql',
+      '002_create_usuarios_table.sql'
+    ];
+    
+    for (const migrationFile of migrations) {
+      console.log(`Executando migração: ${migrationFile}`);
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, 'migrations', migrationFile),
+        'utf8'
+      );
+      await pool.query(migrationSQL);
+      console.log(`✓ ${migrationFile} executada com sucesso`);
+    }
+    
+    console.log('Todas as migrações foram executadas com sucesso!');
+    
+    process.exit(0);
+  } catch (error) {
+    console.error('Erro na migração:', error);
+    process.exit(1);
+  }
+}
+
+migrate();
+

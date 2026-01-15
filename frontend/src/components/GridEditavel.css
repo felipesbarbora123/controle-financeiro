@@ -1,0 +1,226 @@
+.grid-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+.grid-header {
+  display: grid;
+  grid-template-columns: 120px 1fr 150px 1fr 100px 80px;
+  background-color: #34495e;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.grid-body {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 150px 1fr 100px 80px;
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+}
+
+.grid-row:hover {
+  background-color: #f8f9fa;
+}
+
+.grid-row:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.grid-row:nth-child(even):hover {
+  background-color: #f0f0f0;
+}
+
+.grid-cell {
+  padding: 0.75rem;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  min-height: 45px;
+}
+
+.grid-cell:last-child {
+  border-right: none;
+}
+
+.header-cell {
+  padding: 1rem 0.75rem;
+  text-align: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.grid-cell-content {
+  width: 100%;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  word-break: break-word;
+}
+
+.grid-cell-content:hover {
+  background-color: #e3f2fd;
+}
+
+.grid-input {
+  width: 100%;
+  border: 2px solid #3498db;
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.grid-input:focus {
+  border-color: #2980b9;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.acoes-cell {
+  justify-content: center;
+}
+
+.btn-delete {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+}
+
+.grid-footer {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-adicionar {
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.btn-adicionar:hover {
+  background-color: #229954;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .grid-header,
+  .grid-row {
+    grid-template-columns: 100px 1fr 120px 1fr 80px 60px;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-container {
+    font-size: 0.85rem;
+  }
+
+  .grid-header,
+  .grid-row {
+    grid-template-columns: 90px 1fr 100px 1fr 70px 50px;
+  }
+
+  .grid-cell {
+    padding: 0.5rem 0.25rem;
+    min-height: 40px;
+  }
+
+  .header-cell {
+    padding: 0.75rem 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .grid-input {
+    padding: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-delete {
+    width: 24px;
+    height: 24px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-container {
+    font-size: 0.8rem;
+  }
+
+  .grid-header,
+  .grid-row {
+    grid-template-columns: 80px 1fr 90px 1fr 60px 40px;
+  }
+
+  .grid-cell {
+    padding: 0.4rem 0.2rem;
+    min-height: 35px;
+  }
+
+  .header-cell {
+    padding: 0.6rem 0.2rem;
+    font-size: 0.7rem;
+  }
+
+  .grid-input {
+    padding: 0.2rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Scrollbar styling */
+.grid-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.grid-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.grid-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.grid-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
