@@ -14,9 +14,19 @@ const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Aumentar limite de headers para evitar erro 431
+app.use((req, res, next) => {
+  req.headers['content-length'] = req.headers['content-length'] || '0';
+  next();
+});
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  credentials: true,
+  maxAge: 86400
+}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Database connection
 const pool = new Pool({
@@ -110,12 +120,112 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
 });
 
 // Protected Routes
-// Get all expenses
-app.get('/api/gastos', authenticateToken, async (req, res) => {
+// Restaurantes Routes
+// Get all restaurants
+app.get('/api/restaurantes', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM gastos ORDER BY data DESC, id DESC'
+      'SELECT * FROM restaurantes WHERE ativo = true ORDER BY nome ASC'
     );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erro ao buscar restaurantes:', error);
+    res.status(500).json({ error: 'Erro ao buscar restaurantes' });
+  }
+});
+
+// Get single restaurant
+app.get('/api/restaurantes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM restaurantes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Restaurante não encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao buscar restaurante:', error);
+    res.status(500).json({ error: 'Erro ao buscar restaurante' });
+  }
+});
+
+// Create restaurant
+app.post('/api/restaurantes', authenticateToken, async (req, res) => {
+  try {
+    const { nome, endereco, telefone, email, cnpj, observacoes } = req.body;
+    
+    if (!nome || nome.trim() === '') {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO restaurantes (nome, endereco, telefone, email, cnpj, observacoes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [nome.trim(), endereco || null, telefone || null, email || null, cnpj || null, observacoes || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao criar restaurante:', error);
+    res.status(500).json({ error: 'Erro ao criar restaurante' });
+  }
+});
+
+// Update restaurant
+app.put('/api/restaurantes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, endereco, telefone, email, cnpj, observacoes, ativo } = req.body;
+    
+    if (!nome || nome.trim() === '') {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE restaurantes SET nome = $1, endereco = $2, telefone = $3, email = $4, cnpj = $5, observacoes = $6, ativo = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8 RETURNING *',
+      [nome.trim(), endereco || null, telefone || null, email || null, cnpj || null, observacoes || null, ativo !== undefined ? ativo : true, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Restaurante não encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar restaurante:', error);
+    res.status(500).json({ error: 'Erro ao atualizar restaurante' });
+  }
+});
+
+// Delete restaurant (soft delete - marca como inativo)
+app.delete('/api/restaurantes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'UPDATE restaurantes SET ativo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Restaurante não encontrado' });
+    }
+    res.json({ message: 'Restaurante desativado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao deletar restaurante:', error);
+    res.status(500).json({ error: 'Erro ao deletar restaurante' });
+  }
+});
+
+// Get all expenses (now filtered by restaurante_id if provided)
+app.get('/api/gastos', authenticateToken, async (req, res) => {
+  try {
+    const { restaurante_id } = req.query;
+    let query = 'SELECT * FROM gastos';
+    const params = [];
+    
+    if (restaurante_id) {
+      query += ' WHERE restaurante_id = $1';
+      params.push(restaurante_id);
+    }
+    
+    query += ' ORDER BY data DESC, id DESC';
+    
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Erro ao buscar gastos:', error);
@@ -141,10 +251,15 @@ app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
 // Create expense
 app.post('/api/gastos', authenticateToken, async (req, res) => {
   try {
-    const { data, descricao, valor, observacao, pago } = req.body;
+    const { data, descricao, valor, observacao, pago, restaurante_id } = req.body;
+    
+    if (!restaurante_id) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    
     const result = await pool.query(
-      'INSERT INTO gastos (data, descricao, valor, observacao, pago) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [data, descricao, valor || null, observacao || null, pago || false]
+      'INSERT INTO gastos (data, descricao, valor, observacao, pago, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [data, descricao, valor || null, observacao || null, pago || false, restaurante_id]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -157,10 +272,10 @@ app.post('/api/gastos', authenticateToken, async (req, res) => {
 app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, descricao, valor, observacao, pago } = req.body;
+    const { data, descricao, valor, observacao, pago, restaurante_id } = req.body;
     const result = await pool.query(
-      'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5 WHERE id = $6 RETURNING *',
-      [data, descricao, valor || null, observacao || null, pago || false, id]
+      'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, restaurante_id = $6 WHERE id = $7 RETURNING *',
+      [data, descricao, valor || null, observacao || null, pago || false, restaurante_id, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Gasto não encontrado' });
@@ -200,14 +315,17 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
         if (gasto.id) {
           // Update existing
           await client.query(
-            'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5 WHERE id = $6',
-            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.id]
+            'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, restaurante_id = $6 WHERE id = $7',
+            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.restaurante_id, gasto.id]
           );
         } else {
-          // Insert new
+          // Insert new - restaurante_id é obrigatório
+          if (!gasto.restaurante_id) {
+            throw new Error('restaurante_id é obrigatório para novos gastos');
+          }
           await client.query(
-            'INSERT INTO gastos (data, descricao, valor, observacao, pago) VALUES ($1, $2, $3, $4, $5)',
-            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false]
+            'INSERT INTO gastos (data, descricao, valor, observacao, pago, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6)',
+            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.restaurante_id]
           );
         }
       }
