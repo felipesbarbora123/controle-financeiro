@@ -34,8 +34,15 @@ const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'controle_financeiro',
   password: process.env.DB_PASSWORD || 'postgres',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT, 10) || 5432,
 });
+
+// Log de debug para verificar variáveis (remover em produção se necessário)
+console.log('🔍 Configuração do Banco:');
+console.log('  DB_HOST:', process.env.DB_HOST || '(não definido)');
+console.log('  DB_PORT:', process.env.DB_PORT || '(não definido)');
+console.log('  DB_NAME:', process.env.DB_NAME || '(não definido)');
+console.log('  DB_USER:', process.env.DB_USER || '(não definido)');
 
 // Test database connection
 pool.query('SELECT NOW()', (err, res) => {
