@@ -351,6 +351,25 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
   }
 });
 
+// Health check endpoint para Easypanel
+app.get('/health', async (req, res) => {
+  try {
+    // Testar conexão com banco
+    await pool.query('SELECT 1');
+    res.status(200).json({ 
+      status: 'ok', 
+      database: 'connected',
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'error', 
+      database: 'disconnected',
+      error: error.message 
+    });
+  }
+});
+
 // Iniciar servidor
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
