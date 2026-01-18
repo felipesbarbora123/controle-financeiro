@@ -344,7 +344,40 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Iniciar servidor
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
 
+// Tratamento de sinais para encerramento gracioso
+process.on('SIGTERM', () => {
+  console.log('SIGTERM recebido, encerrando servidor graciosamente...');
+  server.close(() => {
+    console.log('Servidor encerrado');
+    pool.end(() => {
+      console.log('Pool de conexões fechado');
+      process.exit(0);
+    });
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT recebido, encerrando servidor graciosamente...');
+  server.close(() => {
+    console.log('Servidor encerrado');
+    pool.end(() => {
+      console.log('Pool de conexões fechado');
+      process.exit(0);
+    });
+  });
+});
+
+// Tratamento de erros não capturados
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
