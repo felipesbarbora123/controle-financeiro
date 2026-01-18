@@ -45,15 +45,19 @@ const formatarDataParaComparacao = (dataStr) => {
   
   // Se está no formato YYYY-MM-DD
   if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const date = new Date(dataStr + 'T00:00:00');
+    const [ano, mes, dia] = dataStr.split('-');
+    const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+    date.setHours(0, 0, 0, 0);
     console.log('[FORMATAR_DATA] Data formatada (YYYY-MM-DD):', date.toISOString().split('T')[0]);
     return date;
   }
   
   // Se está no formato ISO (com timestamp) - formato do PostgreSQL
   if (dataStr.match(/^\d{4}-\d{2}-\d{2}T/)) {
-    const date = new Date(dataStr);
-    // Normalizar para meia-noite para comparação
+    // Extrair apenas a parte da data (YYYY-MM-DD) e criar data em UTC
+    const dataPart = dataStr.split('T')[0];
+    const [ano, mes, dia] = dataPart.split('-');
+    const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
     date.setHours(0, 0, 0, 0);
     console.log('[FORMATAR_DATA] Data formatada (ISO):', date.toISOString().split('T')[0]);
     return date;
@@ -62,7 +66,8 @@ const formatarDataParaComparacao = (dataStr) => {
   // Se está no formato DD/MM/YYYY
   if (dataStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
     const [dia, mes, ano] = dataStr.split('/');
-    const date = new Date(ano, mes - 1, dia);
+    const date = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+    date.setHours(0, 0, 0, 0);
     console.log('[FORMATAR_DATA] Data formatada (DD/MM/YYYY):', date.toISOString().split('T')[0]);
     return date;
   }
@@ -73,9 +78,14 @@ const formatarDataParaComparacao = (dataStr) => {
     console.error('[FORMATAR_DATA] ❌ Erro ao parsear data:', dataStr);
     return null;
   }
-  date.setHours(0, 0, 0, 0);
-  console.log('[FORMATAR_DATA] Data formatada (genérico):', date.toISOString().split('T')[0]);
-  return date;
+  // Extrair apenas ano, mês e dia para evitar problemas de timezone
+  const ano = date.getFullYear();
+  const mes = date.getMonth();
+  const dia = date.getDate();
+  const dateNormalizada = new Date(ano, mes, dia);
+  dateNormalizada.setHours(0, 0, 0, 0);
+  console.log('[FORMATAR_DATA] Data formatada (genérico):', dateNormalizada.toISOString().split('T')[0]);
+  return dateNormalizada;
 };
 
 const pertenceSemanaAtual = (dataStr) => {
