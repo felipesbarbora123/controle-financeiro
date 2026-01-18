@@ -240,12 +240,16 @@ app.get('/api/gastos', authenticateToken, async (req, res) => {
         // Se já é string no formato YYYY-MM-DD, usar diretamente
         if (typeof gasto.data === 'string' && gasto.data.match(/^\d{4}-\d{2}-\d{2}$/)) {
           dataFormatada = gasto.data;
+        } else if (typeof gasto.data === 'string' && gasto.data.match(/^\d{4}-\d{2}-\d{2}T/)) {
+          // Se é ISO string, extrair apenas a parte da data antes do T
+          dataFormatada = gasto.data.split('T')[0];
         } else {
-          // Caso contrário, extrair apenas a parte da data (YYYY-MM-DD)
+          // Caso contrário (objeto Date), extrair a data local (não UTC)
           const date = new Date(gasto.data);
-          const ano = date.getUTCFullYear();
-          const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
-          const dia = String(date.getUTCDate()).padStart(2, '0');
+          // Usar métodos locais para preservar o dia correto
+          const ano = date.getFullYear();
+          const mes = String(date.getMonth() + 1).padStart(2, '0');
+          const dia = String(date.getDate()).padStart(2, '0');
           dataFormatada = `${ano}-${mes}-${dia}`;
         }
       }
@@ -274,11 +278,15 @@ app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
     if (result.rows[0].data) {
       if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
         dataFormatada = result.rows[0].data;
+      } else if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}T/)) {
+        // Se é ISO string, extrair apenas a parte da data
+        dataFormatada = result.rows[0].data.split('T')[0];
       } else {
+        // Caso contrário (objeto Date), extrair a data local
         const date = new Date(result.rows[0].data);
-        const ano = date.getUTCFullYear();
-        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const dia = String(date.getUTCDate()).padStart(2, '0');
+        const ano = date.getFullYear();
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const dia = String(date.getDate()).padStart(2, '0');
         dataFormatada = `${ano}-${mes}-${dia}`;
       }
     }
@@ -311,11 +319,15 @@ app.post('/api/gastos', authenticateToken, async (req, res) => {
     if (result.rows[0].data) {
       if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
         dataFormatada = result.rows[0].data;
+      } else if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}T/)) {
+        // Se é ISO string, extrair apenas a parte da data
+        dataFormatada = result.rows[0].data.split('T')[0];
       } else {
+        // Caso contrário (objeto Date), extrair a data local
         const date = new Date(result.rows[0].data);
-        const ano = date.getUTCFullYear();
-        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const dia = String(date.getUTCDate()).padStart(2, '0');
+        const ano = date.getFullYear();
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const dia = String(date.getDate()).padStart(2, '0');
         dataFormatada = `${ano}-${mes}-${dia}`;
       }
     }
@@ -347,11 +359,15 @@ app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
     if (result.rows[0].data) {
       if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
         dataFormatada = result.rows[0].data;
+      } else if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}T/)) {
+        // Se é ISO string, extrair apenas a parte da data
+        dataFormatada = result.rows[0].data.split('T')[0];
       } else {
+        // Caso contrário (objeto Date), extrair a data local
         const date = new Date(result.rows[0].data);
-        const ano = date.getUTCFullYear();
-        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const dia = String(date.getUTCDate()).padStart(2, '0');
+        const ano = date.getFullYear();
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const dia = String(date.getDate()).padStart(2, '0');
         dataFormatada = `${ano}-${mes}-${dia}`;
       }
     }
