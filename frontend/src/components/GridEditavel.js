@@ -242,21 +242,46 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
   const formatarData = (data) => {
     if (!data) return '';
     // Se já está no formato YYYY-MM-DD (do banco), converter para DD/MM/YYYY
-    if (data.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const [ano, mes, dia] = data.split('-');
       return `${dia}/${mes}/${ano}`;
     }
+    // Se é ISO string (com T), extrair apenas a parte da data
+    if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}T/)) {
+      const dataPart = data.split('T')[0];
+      const [ano, mes, dia] = dataPart.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
     // Se já está no formato DD/MM/YYYY, retornar como está
-    if (data.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    if (typeof data === 'string' && data.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
       return data;
     }
-    // Tentar converter Date object
-    const date = new Date(data);
-    if (!isNaN(date.getTime())) {
-      const dia = String(date.getDate()).padStart(2, '0');
-      const mes = String(date.getMonth() + 1).padStart(2, '0');
-      const ano = date.getFullYear();
-      return `${dia}/${mes}/${ano}`;
+    // Se é um objeto Date, extrair componentes sem timezone
+    if (data instanceof Date) {
+      if (!isNaN(data.getTime())) {
+        const dia = String(data.getDate()).padStart(2, '0');
+        const mes = String(data.getMonth() + 1).padStart(2, '0');
+        const ano = data.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+      }
+    }
+    // Tentar converter string genérica para Date
+    if (typeof data === 'string') {
+      // Se contém T, tratar como ISO e extrair só a data
+      if (data.includes('T')) {
+        const dataPart = data.split('T')[0];
+        const [ano, mes, dia] = dataPart.split('-');
+        return `${dia}/${mes}/${ano}`;
+      }
+      // Tentar parsear como data
+      const date = new Date(data);
+      if (!isNaN(date.getTime())) {
+        // Extrair usando componentes locais para evitar timezone
+        const dia = String(date.getDate()).padStart(2, '0');
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const ano = date.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+      }
     }
     return '';
   };
