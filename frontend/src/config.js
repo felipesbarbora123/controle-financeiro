@@ -6,15 +6,23 @@ const getApiUrl = () => {
     return process.env.REACT_APP_API_URL;
   }
   
-  // Se está acessando de outro dispositivo (não localhost), usa o hostname atual
+  // Se está acessando de outro dispositivo (não localhost)
   const hostname = window.location.hostname;
+  const protocol = window.location.protocol; // 'https:' ou 'http:'
   
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-    // Está acessando de outro dispositivo, usa o hostname atual
-    return `http://${hostname}:5000/api`;
+    // Usa o mesmo protocolo da página (HTTPS em produção)
+    // Se o backend está no mesmo domínio mas porta diferente, ajuste aqui
+    // Por padrão, usa o domínio do backend no Easypanel
+    if (hostname.includes('easypanel.host')) {
+      // Produção: usa o domínio do backend com HTTPS
+      return `https://multi-app-financialmanagementapp.dtun51.easypanel.host/api`;
+    }
+    // Fallback: usa o protocolo atual da página
+    return `${protocol}//${hostname}:5000/api`;
   }
   
-  // Default: localhost
+  // Default: localhost (desenvolvimento)
   return 'http://localhost:5000/api';
 };
 
