@@ -233,7 +233,28 @@ app.get('/api/gastos', authenticateToken, async (req, res) => {
     query += ' ORDER BY data DESC, id DESC';
     
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    // Formatar datas para evitar problemas de timezone
+    const gastosFormatados = result.rows.map(gasto => {
+      let dataFormatada = gasto.data;
+      if (gasto.data) {
+        // Se já é string no formato YYYY-MM-DD, usar diretamente
+        if (typeof gasto.data === 'string' && gasto.data.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          dataFormatada = gasto.data;
+        } else {
+          // Caso contrário, extrair apenas a parte da data (YYYY-MM-DD)
+          const date = new Date(gasto.data);
+          const ano = date.getUTCFullYear();
+          const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+          const dia = String(date.getUTCDate()).padStart(2, '0');
+          dataFormatada = `${ano}-${mes}-${dia}`;
+        }
+      }
+      return {
+        ...gasto,
+        data: dataFormatada
+      };
+    });
+    res.json(gastosFormatados);
   } catch (error) {
     console.error('Erro ao buscar gastos:', error);
     res.status(500).json({ error: 'Erro ao buscar gastos' });
@@ -248,7 +269,24 @@ app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Gasto não encontrado' });
     }
-    res.json(result.rows[0]);
+    // Formatar data para evitar problemas de timezone
+    let dataFormatada = result.rows[0].data;
+    if (result.rows[0].data) {
+      if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        dataFormatada = result.rows[0].data;
+      } else {
+        const date = new Date(result.rows[0].data);
+        const ano = date.getUTCFullYear();
+        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dia = String(date.getUTCDate()).padStart(2, '0');
+        dataFormatada = `${ano}-${mes}-${dia}`;
+      }
+    }
+    const gastoFormatado = {
+      ...result.rows[0],
+      data: dataFormatada
+    };
+    res.json(gastoFormatado);
   } catch (error) {
     console.error('Erro ao buscar gasto:', error);
     res.status(500).json({ error: 'Erro ao buscar gasto' });
@@ -268,7 +306,24 @@ app.post('/api/gastos', authenticateToken, async (req, res) => {
       'INSERT INTO gastos (data, descricao, valor, observacao, pago, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [data, descricao, valor || null, observacao || null, pago || false, restaurante_id]
     );
-    res.status(201).json(result.rows[0]);
+    // Formatar data para evitar problemas de timezone
+    let dataFormatada = result.rows[0].data;
+    if (result.rows[0].data) {
+      if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        dataFormatada = result.rows[0].data;
+      } else {
+        const date = new Date(result.rows[0].data);
+        const ano = date.getUTCFullYear();
+        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dia = String(date.getUTCDate()).padStart(2, '0');
+        dataFormatada = `${ano}-${mes}-${dia}`;
+      }
+    }
+    const gastoFormatado = {
+      ...result.rows[0],
+      data: dataFormatada
+    };
+    res.status(201).json(gastoFormatado);
   } catch (error) {
     console.error('Erro ao criar gasto:', error);
     res.status(500).json({ error: 'Erro ao criar gasto' });
@@ -287,7 +342,24 @@ app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Gasto não encontrado' });
     }
-    res.json(result.rows[0]);
+    // Formatar data para evitar problemas de timezone
+    let dataFormatada = result.rows[0].data;
+    if (result.rows[0].data) {
+      if (typeof result.rows[0].data === 'string' && result.rows[0].data.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        dataFormatada = result.rows[0].data;
+      } else {
+        const date = new Date(result.rows[0].data);
+        const ano = date.getUTCFullYear();
+        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dia = String(date.getUTCDate()).padStart(2, '0');
+        dataFormatada = `${ano}-${mes}-${dia}`;
+      }
+    }
+    const gastoFormatado = {
+      ...result.rows[0],
+      data: dataFormatada
+    };
+    res.json(gastoFormatado);
   } catch (error) {
     console.error('Erro ao atualizar gasto:', error);
     res.status(500).json({ error: 'Erro ao atualizar gasto' });
