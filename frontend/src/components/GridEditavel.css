@@ -400,9 +400,9 @@
   /* Manter layout de tabela no mobile - colunas mais estreitas */
   .grid-header {
     display: grid; /* Mostrar header no mobile */
-    grid-template-columns: 60px 1fr 75px 1fr 50px 40px; /* Colunas ainda menores */
-    font-size: 0.6rem; /* Fonte menor */
-    padding: 0.4rem 0.25rem; /* Padding reduzido */
+    grid-template-columns: 70px 1fr 70px 1fr 45px 35px; /* Ajustado: data maior, valor menor */
+    font-size: 0.55rem; /* Fonte ainda menor */
+    padding: 0.35rem 0.2rem; /* Padding reduzido */
     width: 100%;
     box-sizing: border-box;
   }
@@ -416,7 +416,7 @@
 
   .grid-row {
     display: grid; /* Manter grid, não block */
-    grid-template-columns: 60px 1fr 75px 1fr 50px 40px; /* Mesmas colunas do header */
+    grid-template-columns: 70px 1fr 70px 1fr 45px 35px; /* Mesmas colunas do header */
     border-bottom: 1px solid #e0e0e0;
     padding: 0;
     margin: 0;
@@ -438,14 +438,22 @@
 
   .grid-cell {
     display: flex;
-    padding: 0.3rem 0.2rem; /* Reduzido ainda mais */
+    padding: 0.3rem 0.15rem; /* Reduzido ainda mais */
     border-right: 1px solid #e0e0e0;
     border-bottom: none;
     min-height: 32px; /* Reduzido */
-    font-size: 0.6rem; /* Fonte menor */
+    font-size: 0.55rem; /* Fonte menor */
     align-items: center;
     box-sizing: border-box;
     overflow: hidden; /* Prevenir overflow */
+  }
+
+  /* Primeira célula (Data) - evitar quebra */
+  .grid-row > .grid-cell:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .grid-cell:last-child {
@@ -458,19 +466,34 @@
 
   .grid-cell-content {
     width: 100%;
-    font-size: 0.6rem; /* Reduzido */
-    word-break: break-word;
+    font-size: 0.55rem; /* Reduzido */
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap; /* Evitar quebra de linha */
+  }
+
+  /* Permitir quebra apenas em descrição e observação */
+  .grid-row > .grid-cell:nth-child(2) .grid-cell-content,
+  .grid-row > .grid-cell:nth-child(4) .grid-cell-content {
+    white-space: normal;
+    word-break: break-word;
   }
 
   .grid-input {
     width: 100%;
-    font-size: 0.6rem; /* Reduzido */
-    padding: 0.25rem; /* Reduzido */
+    font-size: 0.55rem; /* Reduzido */
+    padding: 0.2rem; /* Reduzido */
     border-width: 1px;
     box-sizing: border-box;
+  }
+
+  /* Input de data - fonte ainda menor e sem quebra */
+  .grid-row > .grid-cell:first-child .grid-input {
+    font-size: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .acoes-cell {
@@ -487,8 +510,8 @@
   }
 
   .header-cell {
-    padding: 0.4rem 0.25rem; /* Reduzido */
-    font-size: 0.6rem; /* Reduzido */
+    padding: 0.35rem 0.2rem; /* Reduzido */
+    font-size: 0.55rem; /* Reduzido */
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -539,33 +562,38 @@
   }
 
   .grid-header {
-    grid-template-columns: 55px 1fr 65px 1fr 45px 35px; /* Colunas ainda menores */
-    font-size: 0.55rem; /* Reduzido */
-    padding: 0.35rem 0.2rem; /* Reduzido */
+    grid-template-columns: 65px 1fr 65px 1fr 40px 32px; /* Ajustado: data maior */
+    font-size: 0.5rem; /* Reduzido */
+    padding: 0.3rem 0.15rem; /* Reduzido */
   }
 
   .grid-row {
-    grid-template-columns: 55px 1fr 65px 1fr 45px 35px; /* Mesmas colunas */
+    grid-template-columns: 65px 1fr 65px 1fr 40px 32px; /* Mesmas colunas */
   }
 
   .grid-cell {
-    padding: 0.25rem 0.15rem; /* Reduzido */
-    font-size: 0.55rem; /* Reduzido */
+    padding: 0.25rem 0.12rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido */
     min-height: 28px; /* Reduzido */
   }
 
   .grid-cell-content {
-    font-size: 0.55rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido */
   }
 
   .grid-input {
-    font-size: 0.55rem; /* Reduzido */
-    padding: 0.2rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido */
+    padding: 0.18rem; /* Reduzido */
+  }
+
+  /* Input de data - fonte ainda menor */
+  .grid-row > .grid-cell:first-child .grid-input {
+    font-size: 0.48rem;
   }
 
   .header-cell {
-    padding: 0.35rem 0.2rem; /* Reduzido */
-    font-size: 0.55rem; /* Reduzido */
+    padding: 0.3rem 0.15rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido */
   }
 
   .btn-delete {
