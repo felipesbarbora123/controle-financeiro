@@ -2,37 +2,52 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './GridEditavel.css';
 
 // Funções utilitárias para cálculo de semanas
-const getDomingoSemanaAtual = () => {
+// Semana começa na segunda-feira e termina no domingo
+const getSegundaSemanaAtual = () => {
   const hoje = new Date();
   const dia = hoje.getDay(); // 0 = domingo, 1 = segunda, etc
-  const diff = hoje.getDate() - dia; // Diferença até o domingo
-  const domingo = new Date(hoje);
-  domingo.setDate(diff);
-  domingo.setHours(0, 0, 0, 0);
+  // Calcular diferença até a segunda-feira
+  // Se hoje é domingo (0), segunda é há 6 dias
+  // Se hoje é segunda (1), segunda é hoje (diff = 0)
+  // Se hoje é terça (2), segunda é ontem (diff = -1)
+  const diff = dia === 0 ? -6 : 1 - dia;
+  const segunda = new Date(hoje);
+  segunda.setDate(hoje.getDate() + diff);
+  segunda.setHours(0, 0, 0, 0);
+  return segunda;
+};
+
+const getDomingoSemanaAtual = () => {
+  const segunda = getSegundaSemanaAtual();
+  const domingo = new Date(segunda);
+  domingo.setDate(segunda.getDate() + 6); // Segunda + 6 dias = domingo
+  domingo.setHours(23, 59, 59, 999);
   return domingo;
 };
 
-const getSabadoSemanaAtual = () => {
-  const domingo = getDomingoSemanaAtual();
-  const sabado = new Date(domingo);
-  sabado.setDate(domingo.getDate() + 6);
-  sabado.setHours(23, 59, 59, 999);
-  return sabado;
+const getSegundaProximaSemana = () => {
+  const segunda = getSegundaSemanaAtual();
+  const proximaSegunda = new Date(segunda);
+  proximaSegunda.setDate(segunda.getDate() + 7);
+  proximaSegunda.setHours(0, 0, 0, 0);
+  return proximaSegunda;
 };
 
 const getDomingoProximaSemana = () => {
-  const domingo = getDomingoSemanaAtual();
-  const proximoDomingo = new Date(domingo);
-  proximoDomingo.setDate(domingo.getDate() + 7);
+  const proximaSegunda = getSegundaProximaSemana();
+  const proximoDomingo = new Date(proximaSegunda);
+  proximoDomingo.setDate(proximaSegunda.getDate() + 6); // Segunda + 6 dias = domingo
+  proximoDomingo.setHours(23, 59, 59, 999);
   return proximoDomingo;
 };
 
+// Manter funções antigas para compatibilidade (deprecated)
+const getSabadoSemanaAtual = () => {
+  return getDomingoSemanaAtual();
+};
+
 const getSabadoProximaSemana = () => {
-  const proximoDomingo = getDomingoProximaSemana();
-  const proximoSabado = new Date(proximoDomingo);
-  proximoSabado.setDate(proximoDomingo.getDate() + 6);
-  proximoSabado.setHours(23, 59, 59, 999);
-  return proximoSabado;
+  return getDomingoProximaSemana();
 };
 
 const formatarDataParaComparacao = (dataStr) => {
@@ -95,14 +110,14 @@ const pertenceSemanaAtual = (dataStr) => {
     return false;
   }
   
+  const segunda = getSegundaSemanaAtual();
   const domingo = getDomingoSemanaAtual();
-  const sabado = getSabadoSemanaAtual();
   
-  const pertence = data >= domingo && data <= sabado;
+  const pertence = data >= segunda && data <= domingo;
   console.log('[PERTENCE_SEMANA] Verificando se', dataStr, 'pertence à semana atual:', {
     data: data.toISOString().split('T')[0],
+    segunda: segunda.toISOString().split('T')[0],
     domingo: domingo.toISOString().split('T')[0],
-    sabado: sabado.toISOString().split('T')[0],
     pertence
   });
   
@@ -116,27 +131,27 @@ const pertenceProximaSemana = (dataStr) => {
     return false;
   }
   
+  const proximaSegunda = getSegundaProximaSemana();
   const proximoDomingo = getDomingoProximaSemana();
-  const proximoSabado = getSabadoProximaSemana();
   
-  const pertence = data >= proximoDomingo && data <= proximoSabado;
+  const pertence = data >= proximaSegunda && data <= proximoDomingo;
   console.log('[PERTENCE_SEMANA] Verificando se', dataStr, 'pertence à próxima semana:', {
     data: data.toISOString().split('T')[0],
+    proximaSegunda: proximaSegunda.toISOString().split('T')[0],
     proximoDomingo: proximoDomingo.toISOString().split('T')[0],
-    proximoSabado: proximoSabado.toISOString().split('T')[0],
     pertence
   });
   
   return pertence;
 };
 
-const formatarPeriodoSemana = (domingo, sabado) => {
+const formatarPeriodoSemana = (segunda, domingo) => {
   const formatarData = (date) => {
     const dia = String(date.getDate()).padStart(2, '0');
     const mes = String(date.getMonth() + 1).padStart(2, '0');
     return `${dia}/${mes}`;
   };
-  return `${formatarData(domingo)} a ${formatarData(sabado)}`;
+  return `${formatarData(segunda)} a ${formatarData(domingo)}`;
 };
 
 const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
@@ -1104,11 +1119,11 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     };
   }, [linhasSemanaAtual, linhasProximaSemana, valorConta]);
 
-  // Calcular períodos das semanas
+  // Calcular períodos das semanas (segunda a domingo)
+  const segundaSemanaAtual = getSegundaSemanaAtual();
   const domingoSemanaAtual = getDomingoSemanaAtual();
-  const sabadoSemanaAtual = getSabadoSemanaAtual();
+  const segundaProximaSemana = getSegundaProximaSemana();
   const domingoProximaSemana = getDomingoProximaSemana();
-  const sabadoProximaSemana = getSabadoProximaSemana();
 
   // Função para formatar valor monetário
   const formatarValorMonetario = (valor) => {
@@ -1241,13 +1256,13 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           linhasSemanaAtual,
           'atual',
           'Semana Atual',
-          formatarPeriodoSemana(domingoSemanaAtual, sabadoSemanaAtual)
+          formatarPeriodoSemana(segundaSemanaAtual, domingoSemanaAtual)
         )}
         {renderizarTabela(
           linhasProximaSemana,
           'proxima',
           'Próxima Semana',
-          formatarPeriodoSemana(domingoProximaSemana, sabadoProximaSemana)
+          formatarPeriodoSemana(segundaProximaSemana, domingoProximaSemana)
         )}
       </div>
     </div>
