@@ -36,25 +36,25 @@
 }
 
 .totalizador-label {
-  font-size: 0.5rem; /* Reduzido ainda mais */
+  font-size: 0.25rem; /* Reduzido para metade */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.1px;
-  line-height: 1.2;
+  letter-spacing: 0.05px;
+  line-height: 1.1;
 }
 
 .totalizador-valor {
-  font-size: 0.65rem; /* Reduzido ainda mais */
+  font-size: 0.32rem; /* Reduzido para metade */
   font-weight: 700;
   color: #2c3e50;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .totalizador-valor.editavel {
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
+  padding: 1px 3px;
+  border-radius: 2px;
   transition: background-color 0.2s;
 }
 
@@ -71,16 +71,16 @@
 }
 
 .totalizador-input {
-  font-size: 0.65rem; /* Reduzido ainda mais */
+  font-size: 0.32rem; /* Reduzido para metade */
   font-weight: 700;
-  padding: 2px 4px;
-  border: 1.5px solid #2196F3;
-  border-radius: 3px;
+  padding: 1px 3px;
+  border: 1px solid #2196F3;
+  border-radius: 2px;
   width: 100%;
   font-family: inherit;
   background: white;
   color: #2c3e50;
-  line-height: 1.2;
+  line-height: 1.1;
   min-height: auto;
 }
 
@@ -335,11 +335,11 @@
   }
 
   .totalizador-label {
-    font-size: 0.48rem;
+    font-size: 0.24rem; /* Reduzido para metade */
   }
 
   .totalizador-valor {
-    font-size: 0.65rem;
+    font-size: 0.32rem; /* Reduzido para metade */
   }
 }
 
@@ -371,17 +371,17 @@
   }
 
   .totalizador-label {
-    font-size: 0.45rem; /* Reduzido ainda mais */
+    font-size: 0.22rem; /* Reduzido para metade */
     margin: 0;
   }
 
   .totalizador-valor {
-    font-size: 0.6rem; /* Reduzido ainda mais */
+    font-size: 0.3rem; /* Reduzido para metade */
   }
 
   .totalizador-input {
-    font-size: 0.6rem; /* Reduzido ainda mais */
-    padding: 2px 3px; /* Reduzido ainda mais */
+    font-size: 0.3rem; /* Reduzido para metade */
+    padding: 1px 2px; /* Reduzido ainda mais */
   }
 
   /* Fazer cada tabela ocupar a tela inteira no mobile */
@@ -561,15 +561,15 @@
   }
 
   .totalizador-label {
-    font-size: 0.45rem; /* Reduzido ainda mais */
+    font-size: 0.22rem; /* Reduzido para metade */
   }
 
   .totalizador-valor {
-    font-size: 0.58rem; /* Reduzido ainda mais */
+    font-size: 0.29rem; /* Reduzido para metade */
   }
 
   .totalizador-input {
-    font-size: 0.58rem; /* Reduzido ainda mais */
+    font-size: 0.29rem; /* Reduzido para metade */
     padding: 1px 2px; /* Reduzido ainda mais */
   }
 
