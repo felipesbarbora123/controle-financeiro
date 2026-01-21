@@ -7,21 +7,21 @@
 .totalizadores-container {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
-  margin-bottom: 6px;
-  padding: 4px;
+  gap: 2px;
+  margin-bottom: 4px;
+  padding: 2px;
   background: white;
-  border-radius: 4px;
+  border-radius: 3px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .totalizador-item {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 2px 4px;
+  gap: 0.5px;
+  padding: 1px 2px;
   background: #f8f9fa;
-  border-radius: 3px;
+  border-radius: 2px;
   border: 1px solid #e0e0e0;
   min-height: auto;
   height: auto;
@@ -38,30 +38,34 @@
 }
 
 .totalizador-label {
-  font-size: 0.04rem; /* Label reduzida para 1/4 do tamanho original */
+  font-size: 0.025rem; /* Label bem pequena */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.005px;
-  line-height: 1;
+  letter-spacing: 0.002px;
+  line-height: 0.8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin: 0;
+  padding: 0;
 }
 
 .totalizador-valor {
-  font-size: 0.18rem; /* Valor de exibição menor */
+  font-size: 0.15rem; /* Valor de exibição menor */
   font-weight: 700;
   color: #2c3e50;
-  line-height: 1;
+  line-height: 0.9;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin: 0;
+  padding: 0;
 }
 
 .totalizador-valor.editavel {
   cursor: pointer;
-  padding: 1px 2px;
+  padding: 0.5px 1px;
   border-radius: 2px;
   transition: background-color 0.2s;
   min-width: 0;
@@ -327,7 +331,7 @@
 @media (max-width: 1400px) {
   .totalizadores-container {
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    gap: 2px;
   }
 
   .grid-container-dual {
@@ -339,23 +343,23 @@
 @media (max-width: 1024px) {
   .totalizadores-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-    padding: 4px;
+    gap: 2px;
+    padding: 2px;
   }
 
   .totalizador-item {
-    padding: 2px 3px;
+    padding: 1px 2px;
     min-height: auto;
     height: auto;
   }
 
   .totalizador-label {
-    font-size: 0.035rem; /* Label reduzida para 1/4 do tamanho original */
+    font-size: 0.022rem; /* Label bem pequena */
     white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.17rem; /* Valor de exibição menor */
+    font-size: 0.14rem; /* Valor de exibição menor */
     white-space: nowrap;
   }
 
@@ -378,13 +382,13 @@
 
   .totalizadores-container {
     grid-template-columns: 1fr;
-    gap: 3px; /* Reduzido ainda mais */
-    padding: 3px; /* Reduzido ainda mais */
-    margin-bottom: 4px; /* Reduzido ainda mais */
+    gap: 1px; /* Reduzido ainda mais */
+    padding: 2px; /* Reduzido ainda mais */
+    margin-bottom: 3px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 2px 3px; /* Reduzido ainda mais */
+    padding: 1px 2px; /* Reduzido ainda mais */
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
@@ -393,14 +397,17 @@
   }
 
   .totalizador-label {
-    font-size: 0.033rem; /* Label reduzida para 1/4 do tamanho original */
+    font-size: 0.02rem; /* Label bem pequena */
     margin: 0;
+    padding: 0;
     white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.16rem; /* Valor de exibição menor */
+    font-size: 0.13rem; /* Valor de exibição menor */
     white-space: nowrap;
+    margin: 0;
+    padding: 0;
   }
 
   .totalizador-input {
@@ -573,13 +580,13 @@
   }
 
   .totalizadores-container {
-    padding: 3px; /* Reduzido ainda mais */
-    margin-bottom: 4px;
-    gap: 3px; /* Reduzido ainda mais */
+    padding: 2px; /* Reduzido ainda mais */
+    margin-bottom: 3px;
+    gap: 1px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 2px 3px; /* Reduzido ainda mais */
+    padding: 1px 2px; /* Reduzido ainda mais */
     flex-direction: row;
     align-items: center;
     min-height: auto;
@@ -587,13 +594,17 @@
   }
 
   .totalizador-label {
-    font-size: 0.033rem; /* Label reduzida para 1/4 do tamanho original */
+    font-size: 0.02rem; /* Label bem pequena */
     white-space: nowrap;
+    margin: 0;
+    padding: 0;
   }
 
   .totalizador-valor {
-    font-size: 0.15rem; /* Valor de exibição menor */
+    font-size: 0.13rem; /* Valor de exibição menor */
     white-space: nowrap;
+    margin: 0;
+    padding: 0;
   }
 
   .totalizador-input {
