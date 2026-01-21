@@ -7,21 +7,21 @@
 .totalizadores-container {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
-  margin-bottom: 6px;
-  padding: 3px;
+  gap: 2px;
+  margin-bottom: 4px;
+  padding: 2px;
   background: white;
-  border-radius: 3px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .totalizador-item {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 2px 4px;
+  gap: 0;
+  padding: 1px 3px;
   background: #f8f9fa;
-  border-radius: 2px;
+  border-radius: 1px;
   border: 1px solid #e0e0e0;
   min-height: auto;
   height: auto;
@@ -39,11 +39,11 @@
 }
 
 .totalizador-label {
-  font-size: 0.5rem; /* Tamanho similar às células do grid */
+  font-size: 0.5rem;
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -53,8 +53,8 @@
 }
 
 .totalizador-valor {
-  font-size: 0.6rem; /* Mesmo tamanho das células de observação do grid */
-  font-weight: 700; /* Negrito como as células */
+  font-size: 0.6rem;
+  font-weight: 700;
   color: #2c3e50;
   line-height: 1;
   white-space: nowrap;
@@ -66,8 +66,8 @@
 
 .totalizador-valor.editavel {
   cursor: pointer;
-  padding: 1px 2px;
-  border-radius: 2px;
+  padding: 0;
+  border-radius: 1px;
   transition: background-color 0.2s;
   min-width: 0;
 }
@@ -85,16 +85,16 @@
 }
 
 .totalizador-input {
-  font-size: 0.6rem; /* Tamanho normal igual às células da tabela */
+  font-size: 0.85rem; /* Aumentado para melhor visibilidade */
   font-weight: 700;
-  padding: 2px 4px;
+  padding: 3px 5px;
   border: 1px solid #2196F3;
   border-radius: 2px;
   width: 100%;
   font-family: inherit;
   background: white;
   color: #2c3e50;
-  line-height: 1;
+  line-height: 1.2;
   min-height: auto;
   height: auto;
   white-space: nowrap;
@@ -330,11 +330,6 @@
 
 /* Responsive Design */
 @media (max-width: 1400px) {
-  .totalizadores-container {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 3px;
-  }
-
   .grid-container-dual {
     grid-template-columns: 1fr;
     gap: 15px;
@@ -342,32 +337,7 @@
 }
 
 @media (max-width: 1024px) {
-  .totalizadores-container {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 3px;
-    padding: 3px;
-  }
-
-  .totalizador-item {
-    padding: 2px 3px;
-    min-height: auto;
-    height: auto;
-  }
-
-  .totalizador-label {
-    font-size: 0.5rem; /* Tamanho similar às células do grid */
-    white-space: nowrap;
-  }
-
-  .totalizador-valor {
-    font-size: 0.6rem; /* Mesmo tamanho das células de observação */
-    white-space: nowrap;
-  }
-
-  .totalizador-input {
-    font-size: 0.5rem; /* Tamanho normal para tablet */
-    padding: 2px 3px;
-  }
+  /* Totalizadores mantêm tamanho fixo - sem responsividade */
 }
 
 @media (max-width: 1200px) {
@@ -382,40 +352,7 @@
     font-size: 0.6rem; /* Reduzido ainda mais */
   }
 
-  .totalizadores-container {
-    grid-template-columns: 1fr;
-    gap: 2px;
-    padding: 3px;
-    margin-bottom: 6px;
-  }
-
-  .totalizador-item {
-    padding: 2px 4px;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    min-height: auto;
-    height: auto;
-  }
-
-  .totalizador-label {
-    font-size: 0.5rem; /* Tamanho similar às células do grid */
-    margin: 0;
-    padding: 0;
-    white-space: nowrap;
-  }
-
-  .totalizador-valor {
-    font-size: 0.6rem; /* Mesmo tamanho das células de observação */
-    white-space: nowrap;
-    margin: 0;
-    padding: 0;
-  }
-
-  .totalizador-input {
-    font-size: 0.5rem;
-    padding: 2px 3px;
-  }
+  /* Totalizadores mantêm tamanho fixo - sem responsividade */
 
   .totalizador-input {
     font-size: 0.5rem; /* Tamanho normal para mobile (igual às células) */
@@ -586,38 +523,7 @@
     font-size: 0.6rem; /* Ainda menor em telas muito pequenas */
   }
 
-  .totalizadores-container {
-    padding: 3px;
-    margin-bottom: 6px;
-    gap: 2px;
-  }
-
-  .totalizador-item {
-    padding: 2px 4px;
-    flex-direction: row;
-    align-items: center;
-    min-height: auto;
-    height: auto;
-  }
-
-  .totalizador-label {
-    font-size: 0.5rem; /* Tamanho similar às células do grid */
-    white-space: nowrap;
-    margin: 0;
-    padding: 0;
-  }
-
-  .totalizador-valor {
-    font-size: 0.6rem; /* Mesmo tamanho das células de observação */
-    white-space: nowrap;
-    margin: 0;
-    padding: 0;
-  }
-
-  .totalizador-input {
-    font-size: 0.4rem;
-    padding: 1px 2px;
-  }
+  /* Totalizadores mantêm tamanho fixo - sem responsividade */
 
   .totalizador-input {
     font-size: 0.4rem; /* Tamanho normal para mobile pequeno */
