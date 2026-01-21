@@ -38,11 +38,11 @@
 }
 
 .totalizador-label {
-  font-size: 0.15rem; /* Label bem pequena */
+  font-size: 0.08rem; /* Label reduzida para metade */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.02px;
+  letter-spacing: 0.01px;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -350,7 +350,7 @@
   }
 
   .totalizador-label {
-    font-size: 0.14rem; /* Label bem pequena */
+    font-size: 0.07rem; /* Label reduzida para metade */
     white-space: nowrap;
   }
 
@@ -393,7 +393,7 @@
   }
 
   .totalizador-label {
-    font-size: 0.13rem; /* Label bem pequena */
+    font-size: 0.065rem; /* Label reduzida para metade */
     margin: 0;
     white-space: nowrap;
   }
@@ -587,7 +587,7 @@
   }
 
   .totalizador-label {
-    font-size: 0.13rem; /* Label bem pequena */
+    font-size: 0.065rem; /* Label reduzida para metade */
     white-space: nowrap;
   }
 
