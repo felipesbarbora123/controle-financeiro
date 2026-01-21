@@ -304,15 +304,15 @@ app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
 // Create expense
 app.post('/api/gastos', authenticateToken, async (req, res) => {
   try {
-    const { data, descricao, valor, observacao, pago, restaurante_id } = req.body;
+    const { data, descricao, valor, observacao, pago, retroativo, restaurante_id } = req.body;
     
     if (!restaurante_id) {
       return res.status(400).json({ error: 'restaurante_id é obrigatório' });
     }
     
     const result = await pool.query(
-      'INSERT INTO gastos (data, descricao, valor, observacao, pago, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [data, descricao, valor || null, observacao || null, pago || false, restaurante_id]
+      'INSERT INTO gastos (data, descricao, valor, observacao, pago, retroativo, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [data, descricao, valor || null, observacao || null, pago || false, retroativo || false, restaurante_id]
     );
     // Formatar data para evitar problemas de timezone
     let dataFormatada = result.rows[0].data;
@@ -346,10 +346,10 @@ app.post('/api/gastos', authenticateToken, async (req, res) => {
 app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, descricao, valor, observacao, pago, restaurante_id } = req.body;
+    const { data, descricao, valor, observacao, pago, retroativo, restaurante_id } = req.body;
     const result = await pool.query(
-      'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, restaurante_id = $6 WHERE id = $7 RETURNING *',
-      [data, descricao, valor || null, observacao || null, pago || false, restaurante_id, id]
+      'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, retroativo = $6, restaurante_id = $7 WHERE id = $8 RETURNING *',
+      [data, descricao, valor || null, observacao || null, pago || false, retroativo || false, restaurante_id, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Gasto não encontrado' });
@@ -410,8 +410,8 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
         if (gasto.id) {
           // Update existing
           await client.query(
-            'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, restaurante_id = $6 WHERE id = $7',
-            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.restaurante_id, gasto.id]
+            'UPDATE gastos SET data = $1, descricao = $2, valor = $3, observacao = $4, pago = $5, retroativo = $6, restaurante_id = $7 WHERE id = $8',
+            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.retroativo || false, gasto.restaurante_id, gasto.id]
           );
         } else {
           // Insert new - restaurante_id é obrigatório
@@ -419,8 +419,8 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
             throw new Error('restaurante_id é obrigatório para novos gastos');
           }
           await client.query(
-            'INSERT INTO gastos (data, descricao, valor, observacao, pago, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6)',
-            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.restaurante_id]
+            'INSERT INTO gastos (data, descricao, valor, observacao, pago, retroativo, restaurante_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [gasto.data, gasto.descricao, gasto.valor || null, gasto.observacao || null, gasto.pago || false, gasto.retroativo || false, gasto.restaurante_id]
           );
         }
       }

@@ -168,11 +168,25 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
   });
   const [editandoConta, setEditandoConta] = useState(false);
   const [valorContaTexto, setValorContaTexto] = useState('');
+  
+  // Carregar valor do repasse do localStorage ao montar
+  const [valorRepasse, setValorRepasse] = useState(() => {
+    const salvo = localStorage.getItem(`repasse_${restauranteId}`);
+    return salvo ? parseFloat(salvo) || 0 : 0;
+  });
+  const [editandoRepasse, setEditandoRepasse] = useState(false);
+  const [valorRepasseTexto, setValorRepasseTexto] = useState('');
 
   // Atualizar valor da conta quando restaurante mudar
   useEffect(() => {
     const salvo = localStorage.getItem(`conta_${restauranteId}`);
     setValorConta(salvo ? parseFloat(salvo) || 0 : 0);
+  }, [restauranteId]);
+  
+  // Atualizar valor do repasse quando restaurante mudar
+  useEffect(() => {
+    const salvo = localStorage.getItem(`repasse_${restauranteId}`);
+    setValorRepasse(salvo ? parseFloat(salvo) || 0 : 0);
   }, [restauranteId]);
 
   // Separar gastos por semana
@@ -196,6 +210,11 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         pertenceAtual,
         pertenceProxima
       });
+      
+      // Garantir que retroativo existe (para dados antigos que não têm esse campo)
+      if (gasto.retroativo === undefined || gasto.retroativo === null) {
+        gasto.retroativo = false;
+      }
       
       if (pertenceAtual) {
         semanaAtual.push(gasto);
@@ -235,11 +254,11 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     // Adicionar uma linha vazia no final de cada tabela para facilitar adição
     const linhasAtualComVazia = [
       ...gastosSemanaAtual,
-      { id: null, data: '', descricao: '', valor: '', observacao: '', pago: false, restaurante_id: restauranteId }
+      { id: null, data: '', descricao: '', valor: '', observacao: '', pago: false, retroativo: false, restaurante_id: restauranteId }
     ];
     const linhasProximaComVazia = [
       ...gastosProximaSemana,
-      { id: null, data: '', descricao: '', valor: '', observacao: '', pago: false, restaurante_id: restauranteId }
+      { id: null, data: '', descricao: '', valor: '', observacao: '', pago: false, retroativo: false, restaurante_id: restauranteId }
     ];
     
     console.log('[USE_EFFECT] Linhas semana atual (com vazia):', linhasAtualComVazia.length);
@@ -513,6 +532,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     } else if (campo === 'pago') {
       linha.pago = valor;
       console.log('[ATUALIZAR] Pago atualizado para:', valor);
+    } else if (campo === 'retroativo') {
+      linha.retroativo = valor;
+      console.log('[ATUALIZAR] Retroativo atualizado para:', valor);
     } else {
       linha[campo] = valor;
       console.log('[ATUALIZAR] Campo', campo, 'atualizado para:', valor);
@@ -582,6 +604,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       valor: linhaParaSalvar.valor !== undefined && linhaParaSalvar.valor !== null ? linhaParaSalvar.valor : null,
       observacao: linhaParaSalvar.observacao || '',
       pago: linhaParaSalvar.pago !== undefined ? linhaParaSalvar.pago : false,
+      retroativo: linhaParaSalvar.retroativo !== undefined ? linhaParaSalvar.retroativo : false,
       restaurante_id: restauranteId || linhaParaSalvar.restaurante_id || null
     };
 
@@ -846,12 +869,24 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           <div className="grid-cell header-cell">Valor</div>
           <div className="grid-cell header-cell">Observação</div>
           <div className="grid-cell header-cell">Pago</div>
+          <div className="grid-cell header-cell">Retroativo</div>
           <div className="grid-cell header-cell">Ações</div>
         </div>
 
         <div className="grid-body">
-          {linhas.map((linha, linhaIndex) => (
-          <div key={linha.id || `new-${linhaIndex}`} className="grid-row">
+          {linhas.map((linha, linhaIndex) => {
+            // Determinar classe CSS baseada no estado da linha
+            let rowClass = 'grid-row';
+            if (linha.retroativo) {
+              rowClass += ' row-retroativo';
+            } else if (linha.pago) {
+              rowClass += ' row-pago';
+            } else {
+              rowClass += ' row-nao-pago';
+            }
+            
+            return (
+          <div key={linha.id || `new-${linhaIndex}`} className={rowClass}>
             <div className="grid-cell" data-label="Data">
               {estaEditando(linhaIndex, 'data') ? (
                 <input
@@ -999,6 +1034,32 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
               )}
             </div>
 
+            <div className="grid-cell" data-label="Retroativo">
+              {estaEditando(linhaIndex, 'retroativo') ? (
+                <select
+                  value={linha.retroativo ? 'sim' : 'nao'}
+                  onChange={(e) => {
+                    atualizarLinha(linhaIndex, 'retroativo', e.target.value === 'sim', false, tabela);
+                    salvarLinha(linhaIndex, false, true, tabela);
+                  }}
+                  onBlur={() => handleLinhaBlur(linhaIndex, 'retroativo', tabela)}
+                  onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'retroativo', tabela)}
+                  autoFocus
+                  className="grid-input"
+                >
+                  <option value="nao">Não</option>
+                  <option value="sim">Sim</option>
+                </select>
+              ) : (
+                <div
+                  className="grid-cell-content"
+                  onClick={() => iniciarEdicao(linhaIndex, 'retroativo', tabela)}
+                >
+                  {linha.retroativo ? 'Sim' : 'Não'}
+                </div>
+              )}
+            </div>
+
             <div className="grid-cell acoes-cell" data-label="Ações">
               <button
                 className="btn-delete"
@@ -1009,9 +1070,10 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
               </button>
             </div>
           </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
-    </div>
     );
   };
 
@@ -1059,21 +1121,41 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       return total + (valor || 0);
     }, 0);
 
-    // Total de despesas pagas (da semana atual)
+    // Total de despesas pagas (da semana atual) - inclui retroativos automaticamente
     const valorJaPago = linhasSemanaAtual.reduce((total, linha) => {
       // Ignorar linha vazia
       if (!linha.id && !linha.descricao && !linha.data && !linha.valor && !linha.valorTexto) {
         return total;
       }
-      if (linha.pago) {
+      // Se está pago OU é retroativo, incluir no valor já pago
+      if (linha.pago || linha.retroativo) {
         const valor = extrairValorNumerico(linha);
         return total + (valor || 0);
       }
       return total;
     }, 0);
 
-    // Saldo semanal (conta - despesas pagas)
-    const saldoSemanal = valorConta - valorJaPago;
+    // Total de retroativos (da semana atual)
+    const retroativos = linhasSemanaAtual.reduce((total, linha) => {
+      // Ignorar linha vazia
+      if (!linha.id && !linha.descricao && !linha.data && !linha.valor && !linha.valorTexto) {
+        return total;
+      }
+      if (linha.retroativo) {
+        const valor = extrairValorNumerico(linha);
+        return total + (valor || 0);
+      }
+      return total;
+    }, 0);
+
+    // Total = Conta + Repasse
+    const total = valorConta + valorRepasse;
+
+    // Saldo semanal = Repasse - Total de despesas
+    const saldoSemanal = valorRepasse - despesasSemanaAtual;
+
+    // Saldo total = Conta + Repasse - (Despesas - Retroativos)
+    const saldoTotal = valorConta + valorRepasse - (despesasSemanaAtual - retroativos);
 
     // Log detalhado para debug - apenas quando houver linhas
     if (linhasSemanaAtual.length > 0 || linhasProximaSemana.length > 0) {
@@ -1112,12 +1194,16 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
 
     return {
       valorConta,
+      valorRepasse,
+      total,
       despesasSemanaAtual,
       despesasProximaSemana,
+      retroativos,
       valorJaPago,
-      saldoSemanal
+      saldoSemanal,
+      saldoTotal
     };
-  }, [linhasSemanaAtual, linhasProximaSemana, valorConta]);
+  }, [linhasSemanaAtual, linhasProximaSemana, valorConta, valorRepasse]);
 
   // Calcular períodos das semanas (segunda a domingo)
   const segundaSemanaAtual = getSegundaSemanaAtual();
@@ -1181,6 +1267,34 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     setEditandoConta(true);
   };
 
+  // Handler para editar valor do repasse
+  const handleRepasseChange = (e) => {
+    const valorDigitado = e.target.value;
+    // Aplicar máscara monetária enquanto digita
+    const valorComMascara = aplicarMascaraValor(valorDigitado);
+    setValorRepasseTexto(valorComMascara);
+  };
+
+  const handleRepasseBlur = (e) => {
+    const valorDigitado = valorRepasseTexto || e.target.value;
+    const valorParseado = parsearValor(valorDigitado);
+    if (valorParseado !== null && !isNaN(valorParseado)) {
+      setValorRepasse(valorParseado);
+      console.log('[REPASSE] Valor do repasse atualizado para:', valorParseado);
+      // Salvar no localStorage para persistir
+      localStorage.setItem(`repasse_${restauranteId}`, valorParseado.toString());
+    } else {
+      // Se não conseguiu parsear, manter o valor anterior
+      setValorRepasseTexto('');
+    }
+    setEditandoRepasse(false);
+  };
+
+  const iniciarEdicaoRepasse = () => {
+    setValorRepasseTexto(formatarValorMonetario(valorRepasse).replace('R$ ', '').replace(/\./g, ''));
+    setEditandoRepasse(true);
+  };
+
   // Renderizar totalizadores
   const renderizarTotalizadores = () => {
     return (
@@ -1217,6 +1331,45 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           )}
         </div>
 
+        <div className="totalizador-item conta-item">
+          <label className="totalizador-label">Repasse:</label>
+          {editandoRepasse ? (
+            <input
+              type="text"
+              className="totalizador-input"
+              value={valorRepasseTexto}
+              onChange={handleRepasseChange}
+              onBlur={handleRepasseBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.target.blur();
+                } else if (e.key === 'Escape') {
+                  setValorRepasseTexto('');
+                  setEditandoRepasse(false);
+                }
+              }}
+              autoFocus
+              placeholder="0,00"
+              inputMode="decimal"
+            />
+          ) : (
+            <div 
+              className="totalizador-valor editavel"
+              onClick={iniciarEdicaoRepasse}
+              title="Clique para editar"
+            >
+              {formatarValorMonetario(totais.valorRepasse)}
+            </div>
+          )}
+        </div>
+
+        <div className="totalizador-item">
+          <label className="totalizador-label">Total:</label>
+          <div className="totalizador-valor">
+            {formatarValorMonetario(totais.total)}
+          </div>
+        </div>
+
         <div className="totalizador-item">
           <label className="totalizador-label">Despesas Futura:</label>
           <div className="totalizador-valor">
@@ -1232,9 +1385,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         </div>
 
         <div className="totalizador-item">
-          <label className="totalizador-label">Valor Já Pago:</label>
+          <label className="totalizador-label">Retroativos:</label>
           <div className="totalizador-valor">
-            {formatarValorMonetario(totais.valorJaPago)}
+            {formatarValorMonetario(totais.retroativos)}
           </div>
         </div>
 
@@ -1242,6 +1395,13 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           <label className="totalizador-label">Saldo Semanal:</label>
           <div className={`totalizador-valor saldo ${totais.saldoSemanal < 0 ? 'negativo' : 'positivo'}`}>
             {formatarValorMonetario(totais.saldoSemanal)}
+          </div>
+        </div>
+
+        <div className="totalizador-item saldo-item">
+          <label className="totalizador-label">Saldo Total:</label>
+          <div className={`totalizador-valor saldo ${totais.saldoTotal < 0 ? 'negativo' : 'positivo'}`}>
+            {formatarValorMonetario(totais.saldoTotal)}
           </div>
         </div>
       </div>
