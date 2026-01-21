@@ -7,21 +7,21 @@
 .totalizadores-container {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 8px;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px;
   background: white;
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .totalizador-item {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 6px;
+  gap: 2px;
+  padding: 4px;
   background: #f8f9fa;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #e0e0e0;
 }
 
@@ -36,23 +36,25 @@
 }
 
 .totalizador-label {
-  font-size: 0.55rem; /* Reduzido ainda mais */
+  font-size: 0.5rem; /* Reduzido ainda mais */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
+  line-height: 1.2;
 }
 
 .totalizador-valor {
-  font-size: 0.75rem; /* Reduzido ainda mais */
+  font-size: 0.65rem; /* Reduzido ainda mais */
   font-weight: 700;
   color: #2c3e50;
+  line-height: 1.2;
 }
 
 .totalizador-valor.editavel {
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
   transition: background-color 0.2s;
 }
 
@@ -69,15 +71,17 @@
 }
 
 .totalizador-input {
-  font-size: 0.75rem; /* Reduzido ainda mais */
+  font-size: 0.65rem; /* Reduzido ainda mais */
   font-weight: 700;
-  padding: 4px;
-  border: 2px solid #2196F3;
-  border-radius: 4px;
+  padding: 2px 4px;
+  border: 1.5px solid #2196F3;
+  border-radius: 3px;
   width: 100%;
   font-family: inherit;
   background: white;
   color: #2c3e50;
+  line-height: 1.2;
+  min-height: auto;
 }
 
 .totalizador-input:focus {
@@ -322,20 +326,20 @@
 @media (max-width: 1024px) {
   .totalizadores-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    padding: 10px;
+    gap: 6px;
+    padding: 6px;
   }
 
   .totalizador-item {
-    padding: 10px;
+    padding: 4px;
   }
 
   .totalizador-label {
-    font-size: 0.55rem;
+    font-size: 0.48rem;
   }
 
   .totalizador-valor {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
   }
 }
 
@@ -353,30 +357,31 @@
 
   .totalizadores-container {
     grid-template-columns: 1fr;
-    gap: 5px; /* Reduzido */
-    padding: 6px; /* Reduzido */
-    margin-bottom: 6px; /* Reduzido */
+    gap: 4px; /* Reduzido ainda mais */
+    padding: 4px; /* Reduzido ainda mais */
+    margin-bottom: 5px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 5px; /* Reduzido */
+    padding: 3px 4px; /* Reduzido ainda mais */
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    min-height: auto;
   }
 
   .totalizador-label {
-    font-size: 0.5rem; /* Reduzido ainda mais */
+    font-size: 0.45rem; /* Reduzido ainda mais */
     margin: 0;
   }
 
   .totalizador-valor {
-    font-size: 0.7rem; /* Reduzido ainda mais */
+    font-size: 0.6rem; /* Reduzido ainda mais */
   }
 
   .totalizador-input {
-    font-size: 0.7rem; /* Reduzido ainda mais */
-    padding: 3px; /* Reduzido */
+    font-size: 0.6rem; /* Reduzido ainda mais */
+    padding: 2px 3px; /* Reduzido ainda mais */
   }
 
   /* Fazer cada tabela ocupar a tela inteira no mobile */
@@ -543,28 +548,29 @@
   }
 
   .totalizadores-container {
-    padding: 6px; /* Reduzido */
-    margin-bottom: 6px;
-    gap: 5px; /* Reduzido */
+    padding: 4px; /* Reduzido ainda mais */
+    margin-bottom: 5px;
+    gap: 4px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 5px; /* Reduzido */
+    padding: 3px 4px; /* Reduzido ainda mais */
     flex-direction: row;
     align-items: center;
+    min-height: auto;
   }
 
   .totalizador-label {
-    font-size: 0.5rem; /* Reduzido ainda mais */
+    font-size: 0.45rem; /* Reduzido ainda mais */
   }
 
   .totalizador-valor {
-    font-size: 0.65rem; /* Reduzido ainda mais */
+    font-size: 0.58rem; /* Reduzido ainda mais */
   }
 
   .totalizador-input {
-    font-size: 0.65rem; /* Reduzido ainda mais */
-    padding: 2px; /* Reduzido ainda mais */
+    font-size: 0.58rem; /* Reduzido ainda mais */
+    padding: 1px 2px; /* Reduzido ainda mais */
   }
 
   .grid-semana-header {
