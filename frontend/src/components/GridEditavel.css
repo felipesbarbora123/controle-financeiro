@@ -38,11 +38,11 @@
 }
 
 .totalizador-label {
-  font-size: 0.18rem; /* Reduzido ainda mais */
+  font-size: 0.15rem; /* Label bem pequena */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.03px;
+  letter-spacing: 0.02px;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -50,7 +50,7 @@
 }
 
 .totalizador-valor {
-  font-size: 0.22rem; /* Reduzido ainda mais */
+  font-size: 0.18rem; /* Valor de exibição menor */
   font-weight: 700;
   color: #2c3e50;
   line-height: 1;
@@ -80,16 +80,16 @@
 }
 
 .totalizador-input {
-  font-size: 0.22rem; /* Reduzido ainda mais */
+  font-size: 0.6rem; /* Tamanho normal igual às células da tabela */
   font-weight: 700;
-  padding: 1px 2px;
-  border: 1px solid #2196F3;
-  border-radius: 2px;
+  padding: 0.3rem;
+  border: 2px solid #2196F3;
+  border-radius: 4px;
   width: 100%;
   font-family: inherit;
   background: white;
   color: #2c3e50;
-  line-height: 1;
+  line-height: 1.2;
   min-height: auto;
   height: auto;
   white-space: nowrap;
@@ -265,7 +265,7 @@
   border: 2px solid #3498db;
   border-radius: 4px;
   padding: 0.3rem; /* Reduzido ainda mais */
-  font-size: 0.6rem; /* Reduzido ainda mais */
+  font-size: 0.6rem; /* Tamanho padrão das células */
   font-family: inherit;
   outline: none;
 }
@@ -350,13 +350,17 @@
   }
 
   .totalizador-label {
-    font-size: 0.17rem; /* Reduzido ainda mais */
+    font-size: 0.14rem; /* Label bem pequena */
     white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.21rem; /* Reduzido ainda mais */
+    font-size: 0.17rem; /* Valor de exibição menor */
     white-space: nowrap;
+  }
+
+  .totalizador-input {
+    font-size: 0.5rem; /* Tamanho normal para tablet */
   }
 }
 
@@ -389,19 +393,19 @@
   }
 
   .totalizador-label {
-    font-size: 0.16rem; /* Reduzido ainda mais */
+    font-size: 0.13rem; /* Label bem pequena */
     margin: 0;
     white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.2rem; /* Reduzido ainda mais */
+    font-size: 0.16rem; /* Valor de exibição menor */
     white-space: nowrap;
   }
 
   .totalizador-input {
-    font-size: 0.2rem; /* Reduzido ainda mais */
-    padding: 1px 2px; /* Reduzido ainda mais */
+    font-size: 0.5rem; /* Tamanho normal para mobile (igual às células) */
+    padding: 0.2rem;
     white-space: nowrap;
   }
 
@@ -583,18 +587,18 @@
   }
 
   .totalizador-label {
-    font-size: 0.16rem; /* Reduzido ainda mais */
+    font-size: 0.13rem; /* Label bem pequena */
     white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.2rem; /* Reduzido ainda mais */
+    font-size: 0.15rem; /* Valor de exibição menor */
     white-space: nowrap;
   }
 
   .totalizador-input {
-    font-size: 0.2rem; /* Reduzido ainda mais */
-    padding: 1px 2px; /* Reduzido ainda mais */
+    font-size: 0.4rem; /* Tamanho normal para mobile pequeno */
+    padding: 0.15rem;
     white-space: nowrap;
   }
 
