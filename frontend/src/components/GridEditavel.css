@@ -1,15 +1,15 @@
 .grid-wrapper {
   width: 100%;
   max-width: 100%;
-  font-size: 0.9rem; /* Reduzir fonte geral */
+  font-size: 0.7rem; /* Reduzido ainda mais */
 }
 
 .totalizadores-container {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 10px;
-  margin-bottom: 15px;
-  padding: 12px;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -18,8 +18,8 @@
 .totalizador-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  gap: 3px;
+  padding: 6px;
   background: #f8f9fa;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
@@ -36,15 +36,15 @@
 }
 
 .totalizador-label {
-  font-size: 0.65rem; /* Reduzido ainda mais */
+  font-size: 0.55rem; /* Reduzido ainda mais */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .totalizador-valor {
-  font-size: 0.9rem; /* Reduzido ainda mais */
+  font-size: 0.75rem; /* Reduzido ainda mais */
   font-weight: 700;
   color: #2c3e50;
 }
@@ -69,9 +69,9 @@
 }
 
 .totalizador-input {
-  font-size: 0.9rem; /* Reduzido ainda mais */
+  font-size: 0.75rem; /* Reduzido ainda mais */
   font-weight: 700;
-  padding: 6px;
+  padding: 4px;
   border: 2px solid #2196F3;
   border-radius: 4px;
   width: 100%;
@@ -135,12 +135,12 @@
 
 .grid-semana-header h3 {
   margin: 0;
-  font-size: 1rem; /* Reduzido de 1.2rem */
+  font-size: 0.75rem; /* Reduzido ainda mais */
   font-weight: 600;
 }
 
 .grid-semana-periodo {
-  font-size: 0.8rem; /* Reduzido de 0.9rem */
+  font-size: 0.65rem; /* Reduzido ainda mais */
   opacity: 0.9;
   font-weight: 400;
 }
@@ -163,7 +163,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  font-size: 0.7rem; /* Reduzido ainda mais */
+  font-size: 0.6rem; /* Reduzido ainda mais */
 }
 
 .grid-body {
@@ -208,12 +208,12 @@
 }
 
 .grid-cell {
-  padding: 0.4rem; /* Reduzido ainda mais */
+  padding: 0.3rem; /* Reduzido ainda mais */
   border-right: 1px solid #e0e0e0;
   display: flex;
   align-items: center;
-  min-height: 32px; /* Reduzido ainda mais */
-  font-size: 0.7rem; /* Reduzir fonte das células */
+  min-height: 28px; /* Reduzido ainda mais */
+  font-size: 0.6rem; /* Reduzir fonte das células */
 }
 
 .grid-cell:last-child {
@@ -221,21 +221,22 @@
 }
 
 .header-cell {
-  padding: 0.8rem 0.6rem; /* Reduzido */
+  padding: 0.5rem 0.4rem; /* Reduzido ainda mais */
   text-align: center;
   justify-content: center;
-  font-size: 0.8rem; /* Reduzido de 0.9rem */
+  font-size: 0.6rem; /* Reduzido ainda mais */
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .grid-cell-content {
   width: 100%;
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 0.2rem;
   border-radius: 4px;
   transition: background-color 0.2s;
   word-break: break-word;
+  font-size: 0.6rem; /* Reduzido */
 }
 
 .grid-cell-content:hover {
@@ -246,8 +247,8 @@
   width: 100%;
   border: 2px solid #3498db;
   border-radius: 4px;
-  padding: 0.4rem; /* Reduzido de 0.5rem */
-  font-size: 0.85rem; /* Reduzido de 0.9rem */
+  padding: 0.3rem; /* Reduzido ainda mais */
+  font-size: 0.6rem; /* Reduzido ainda mais */
   font-family: inherit;
   outline: none;
 }
@@ -266,10 +267,10 @@
   color: white;
   border: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -330,11 +331,11 @@
   }
 
   .totalizador-label {
-    font-size: 0.8rem;
+    font-size: 0.55rem;
   }
 
   .totalizador-valor {
-    font-size: 1.1rem;
+    font-size: 0.75rem;
   }
 }
 
@@ -347,35 +348,35 @@
 
 @media (max-width: 768px) {
   .grid-wrapper {
-    font-size: 0.65rem; /* Reduzido ainda mais */
+    font-size: 0.6rem; /* Reduzido ainda mais */
   }
 
   .totalizadores-container {
     grid-template-columns: 1fr;
-    gap: 6px; /* Reduzido */
-    padding: 8px; /* Reduzido */
-    margin-bottom: 8px; /* Reduzido */
+    gap: 5px; /* Reduzido */
+    padding: 6px; /* Reduzido */
+    margin-bottom: 6px; /* Reduzido */
   }
 
   .totalizador-item {
-    padding: 6px; /* Reduzido */
+    padding: 5px; /* Reduzido */
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
   }
 
   .totalizador-label {
-    font-size: 0.65rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido ainda mais */
     margin: 0;
   }
 
   .totalizador-valor {
-    font-size: 0.85rem; /* Reduzido */
+    font-size: 0.7rem; /* Reduzido ainda mais */
   }
 
   .totalizador-input {
-    font-size: 0.85rem; /* Reduzido */
-    padding: 4px; /* Reduzido */
+    font-size: 0.7rem; /* Reduzido ainda mais */
+    padding: 3px; /* Reduzido */
   }
 
   /* Fazer cada tabela ocupar a tela inteira no mobile */
@@ -407,19 +408,19 @@
   }
 
   .grid-semana-header h3 {
-    font-size: 0.75rem; /* Reduzido */
+    font-size: 0.65rem; /* Reduzido ainda mais */
   }
 
   .grid-semana-periodo {
-    font-size: 0.65rem; /* Reduzido */
+    font-size: 0.55rem; /* Reduzido ainda mais */
   }
 
   /* Manter layout de tabela no mobile - colunas mais estreitas */
   .grid-header {
     display: grid; /* Mostrar header no mobile */
     grid-template-columns: 70px 1fr 70px 1fr 40px 50px 30px; /* Incluindo coluna Retroativo */
-    font-size: 0.55rem; /* Fonte ainda menor */
-    padding: 0.35rem 0.2rem; /* Padding reduzido */
+    font-size: 0.5rem; /* Fonte ainda menor */
+    padding: 0.3rem 0.15rem; /* Padding reduzido */
     width: 100%;
     box-sizing: border-box;
   }
@@ -455,11 +456,11 @@
 
   .grid-cell {
     display: flex;
-    padding: 0.3rem 0.15rem; /* Reduzido ainda mais */
+    padding: 0.25rem 0.12rem; /* Reduzido ainda mais */
     border-right: 1px solid #e0e0e0;
     border-bottom: none;
-    min-height: 32px; /* Reduzido */
-    font-size: 0.55rem; /* Fonte menor */
+    min-height: 28px; /* Reduzido ainda mais */
+    font-size: 0.5rem; /* Fonte menor ainda mais */
     align-items: center;
     box-sizing: border-box;
     overflow: hidden; /* Prevenir overflow */
@@ -483,7 +484,7 @@
 
   .grid-cell-content {
     width: 100%;
-    font-size: 0.55rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido ainda mais */
     line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -499,15 +500,15 @@
 
   .grid-input {
     width: 100%;
-    font-size: 0.55rem; /* Reduzido */
-    padding: 0.2rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido ainda mais */
+    padding: 0.15rem; /* Reduzido ainda mais */
     border-width: 1px;
     box-sizing: border-box;
   }
 
   /* Input de data - fonte ainda menor e sem quebra */
   .grid-row > .grid-cell:first-child .grid-input {
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -554,34 +555,34 @@
   }
 
   .totalizador-label {
-    font-size: 0.6rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido ainda mais */
   }
 
   .totalizador-valor {
-    font-size: 0.75rem; /* Reduzido */
+    font-size: 0.65rem; /* Reduzido ainda mais */
   }
 
   .totalizador-input {
-    font-size: 0.75rem; /* Reduzido */
-    padding: 3px; /* Reduzido */
+    font-size: 0.65rem; /* Reduzido ainda mais */
+    padding: 2px; /* Reduzido ainda mais */
   }
 
   .grid-semana-header {
-    padding: 6px 8px; /* Reduzido */
+    padding: 5px 6px; /* Reduzido ainda mais */
   }
 
   .grid-semana-header h3 {
-    font-size: 0.7rem; /* Reduzido */
+    font-size: 0.6rem; /* Reduzido ainda mais */
   }
 
   .grid-semana-periodo {
-    font-size: 0.6rem; /* Reduzido */
+    font-size: 0.5rem; /* Reduzido ainda mais */
   }
 
   .grid-header {
     grid-template-columns: 65px 1fr 65px 1fr 35px 45px 28px; /* Incluindo coluna Retroativo */
-    font-size: 0.5rem; /* Reduzido */
-    padding: 0.3rem 0.15rem; /* Reduzido */
+    font-size: 0.45rem; /* Reduzido ainda mais */
+    padding: 0.25rem 0.12rem; /* Reduzido ainda mais */
   }
 
   .grid-row {
@@ -589,23 +590,23 @@
   }
 
   .grid-cell {
-    padding: 0.25rem 0.12rem; /* Reduzido */
-    font-size: 0.5rem; /* Reduzido */
-    min-height: 28px; /* Reduzido */
+    padding: 0.18rem 0.08rem; /* Reduzido ainda mais */
+    font-size: 0.4rem; /* Reduzido ainda mais */
+    min-height: 22px; /* Reduzido ainda mais */
   }
 
   .grid-cell-content {
-    font-size: 0.5rem; /* Reduzido */
+    font-size: 0.4rem; /* Reduzido ainda mais */
   }
 
   .grid-input {
-    font-size: 0.5rem; /* Reduzido */
-    padding: 0.18rem; /* Reduzido */
+    font-size: 0.4rem; /* Reduzido ainda mais */
+    padding: 0.12rem; /* Reduzido ainda mais */
   }
 
   /* Input de data - fonte ainda menor */
   .grid-row > .grid-cell:first-child .grid-input {
-    font-size: 0.48rem;
+    font-size: 0.38rem;
   }
 
   .header-cell {
