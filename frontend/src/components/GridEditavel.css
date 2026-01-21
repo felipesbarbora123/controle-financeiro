@@ -7,22 +7,24 @@
 .totalizadores-container {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 6px;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 4px;
   background: white;
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .totalizador-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px;
+  gap: 1px;
+  padding: 2px 4px;
   background: #f8f9fa;
-  border-radius: 4px;
+  border-radius: 3px;
   border: 1px solid #e0e0e0;
+  min-height: auto;
+  height: auto;
 }
 
 .totalizador-item.conta-item {
@@ -36,26 +38,33 @@
 }
 
 .totalizador-label {
-  font-size: 0.25rem; /* Reduzido para metade */
+  font-size: 0.18rem; /* Reduzido ainda mais */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
-  letter-spacing: 0.05px;
-  line-height: 1.1;
+  letter-spacing: 0.03px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .totalizador-valor {
-  font-size: 0.32rem; /* Reduzido para metade */
+  font-size: 0.22rem; /* Reduzido ainda mais */
   font-weight: 700;
   color: #2c3e50;
-  line-height: 1.1;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .totalizador-valor.editavel {
   cursor: pointer;
-  padding: 1px 3px;
+  padding: 1px 2px;
   border-radius: 2px;
   transition: background-color 0.2s;
+  min-width: 0;
 }
 
 .totalizador-valor.editavel:hover {
@@ -71,17 +80,21 @@
 }
 
 .totalizador-input {
-  font-size: 0.32rem; /* Reduzido para metade */
+  font-size: 0.22rem; /* Reduzido ainda mais */
   font-weight: 700;
-  padding: 1px 3px;
+  padding: 1px 2px;
   border: 1px solid #2196F3;
   border-radius: 2px;
   width: 100%;
   font-family: inherit;
   background: white;
   color: #2c3e50;
-  line-height: 1.1;
+  line-height: 1;
   min-height: auto;
+  height: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .totalizador-input:focus {
@@ -326,20 +339,24 @@
 @media (max-width: 1024px) {
   .totalizadores-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-    padding: 6px;
-  }
-
-  .totalizador-item {
+    gap: 4px;
     padding: 4px;
   }
 
+  .totalizador-item {
+    padding: 2px 3px;
+    min-height: auto;
+    height: auto;
+  }
+
   .totalizador-label {
-    font-size: 0.24rem; /* Reduzido para metade */
+    font-size: 0.17rem; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.32rem; /* Reduzido para metade */
+    font-size: 0.21rem; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 }
 
@@ -357,31 +374,35 @@
 
   .totalizadores-container {
     grid-template-columns: 1fr;
-    gap: 4px; /* Reduzido ainda mais */
-    padding: 4px; /* Reduzido ainda mais */
-    margin-bottom: 5px; /* Reduzido ainda mais */
+    gap: 3px; /* Reduzido ainda mais */
+    padding: 3px; /* Reduzido ainda mais */
+    margin-bottom: 4px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 3px 4px; /* Reduzido ainda mais */
+    padding: 2px 3px; /* Reduzido ainda mais */
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
     min-height: auto;
+    height: auto;
   }
 
   .totalizador-label {
-    font-size: 0.22rem; /* Reduzido para metade */
+    font-size: 0.16rem; /* Reduzido ainda mais */
     margin: 0;
+    white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.3rem; /* Reduzido para metade */
+    font-size: 0.2rem; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   .totalizador-input {
-    font-size: 0.3rem; /* Reduzido para metade */
+    font-size: 0.2rem; /* Reduzido ainda mais */
     padding: 1px 2px; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   /* Fazer cada tabela ocupar a tela inteira no mobile */
@@ -548,29 +569,33 @@
   }
 
   .totalizadores-container {
-    padding: 4px; /* Reduzido ainda mais */
-    margin-bottom: 5px;
-    gap: 4px; /* Reduzido ainda mais */
+    padding: 3px; /* Reduzido ainda mais */
+    margin-bottom: 4px;
+    gap: 3px; /* Reduzido ainda mais */
   }
 
   .totalizador-item {
-    padding: 3px 4px; /* Reduzido ainda mais */
+    padding: 2px 3px; /* Reduzido ainda mais */
     flex-direction: row;
     align-items: center;
     min-height: auto;
+    height: auto;
   }
 
   .totalizador-label {
-    font-size: 0.22rem; /* Reduzido para metade */
+    font-size: 0.16rem; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   .totalizador-valor {
-    font-size: 0.29rem; /* Reduzido para metade */
+    font-size: 0.2rem; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   .totalizador-input {
-    font-size: 0.29rem; /* Reduzido para metade */
+    font-size: 0.2rem; /* Reduzido ainda mais */
     padding: 1px 2px; /* Reduzido ainda mais */
+    white-space: nowrap;
   }
 
   .grid-semana-header {
