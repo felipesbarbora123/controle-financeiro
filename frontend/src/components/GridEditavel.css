@@ -21,7 +21,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 10px; /* Definido como 10px */
+  padding: 10px !important; /* Definido como 10px - v2 */
   background: #f8f9fa;
   border-radius: 1px;
   border: 1px solid #e0e0e0;
@@ -46,7 +46,7 @@
 }
 
 .totalizador-label {
-  font-size: 10px; /* Definido como 10px */
+  font-size: 10px !important; /* Definido como 10px - v2 */
   font-weight: 600;
   color: #555;
   text-transform: uppercase;
@@ -61,7 +61,7 @@
 }
 
 .totalizador-valor {
-  font-size: 14px; /* Definido como 14px */
+  font-size: 14px !important; /* Definido como 14px - v2 */
   font-weight: 700;
   color: #2c3e50;
   line-height: 1;
