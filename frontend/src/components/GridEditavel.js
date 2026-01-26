@@ -234,14 +234,38 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     
     return {
       gastosSemanaAtual: semanaAtual.sort((a, b) => {
+        // Linhas vazias (sem id) sempre ficam no final
+        if (!a.id && b.id) return 1;
+        if (a.id && !b.id) return -1;
+        if (!a.id && !b.id) return 0;
+        
         const dataA = formatarDataParaComparacao(a.data);
         const dataB = formatarDataParaComparacao(b.data);
-        return dataB - dataA; // Mais recente primeiro
+        
+        // Se alguma data for inválida, colocar no final
+        if (!dataA && dataB) return 1;
+        if (dataA && !dataB) return -1;
+        if (!dataA && !dataB) return 0;
+        
+        // Ordenar por data crescente (mais antigo primeiro)
+        return dataA - dataB;
       }),
       gastosProximaSemana: proximaSemana.sort((a, b) => {
+        // Linhas vazias (sem id) sempre ficam no final
+        if (!a.id && b.id) return 1;
+        if (a.id && !b.id) return -1;
+        if (!a.id && !b.id) return 0;
+        
         const dataA = formatarDataParaComparacao(a.data);
         const dataB = formatarDataParaComparacao(b.data);
-        return dataB - dataA; // Mais recente primeiro
+        
+        // Se alguma data for inválida, colocar no final
+        if (!dataA && dataB) return 1;
+        if (dataA && !dataB) return -1;
+        if (!dataA && !dataB) return 0;
+        
+        // Ordenar por data crescente (mais antigo primeiro)
+        return dataA - dataB;
       })
     };
   }, [gastos]);
