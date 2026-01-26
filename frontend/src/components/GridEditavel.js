@@ -546,12 +546,17 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       if (salvarValorBruto) {
         linha.valorTexto = valor;
         console.log('[ATUALIZAR] valorTexto atualizado para:', valor);
+        console.log('[ATUALIZAR] Linha após atualizar valorTexto:', JSON.parse(JSON.stringify(linha)));
       } else {
         // Parsear apenas quando sair do campo
         const valorParseado = parsearValor(valor);
         linha.valor = valorParseado;
-        linha.valorTexto = null;
+        // Manter valorTexto formatado para exibição
+        const valorFormatado = valorParseado !== null ? formatarValor(valorParseado) : null;
+        linha.valorTexto = valorFormatado;
         console.log('[ATUALIZAR] Valor parseado:', valorParseado);
+        console.log('[ATUALIZAR] ValorTexto formatado mantido:', valorFormatado);
+        console.log('[ATUALIZAR] Linha após parsear valor:', JSON.parse(JSON.stringify(linha)));
       }
     } else if (campo === 'pago') {
       linha.pago = valor;
@@ -699,18 +704,29 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
             console.log('[SALVAR] ✅ Gasto adicionado na tabela', tabelaCorreta);
           }
         } else {
-          // Atualizar estado local removendo valorTexto e dataTexto após salvar
+          // Atualizar estado local após salvar
           console.log('[SALVAR] Atualizando estado local da tabela', tabela);
           const novasLinhas = [...linhas];
           if (novasLinhas[linhaIndex]) {
-            // Preservar todos os dados, apenas limpar campos temporários
+            // Preservar todos os dados, manter valorTexto formatado se o valor foi parseado
+            const valorFormatado = dadosParaSalvar.valor !== null && dadosParaSalvar.valor !== undefined 
+              ? formatarValor(dadosParaSalvar.valor) 
+              : (novasLinhas[linhaIndex].valorTexto || null);
+            
+            // Se não há valor formatado mas há valorTexto anterior, manter o valorTexto
+            const valorTextoFinal = valorFormatado || novasLinhas[linhaIndex].valorTexto || null;
+            
             novasLinhas[linhaIndex] = {
               ...novasLinhas[linhaIndex],
               ...dadosParaSalvar,
-              valorTexto: null,
+              // Manter valorTexto formatado para exibição
+              valorTexto: valorTextoFinal,
               dataTexto: null
             };
             console.log('[SALVAR] Linha atualizada:', JSON.parse(JSON.stringify(novasLinhas[linhaIndex])));
+            console.log('[SALVAR] Valor numérico:', dadosParaSalvar.valor);
+            console.log('[SALVAR] ValorTexto formatado mantido:', valorTextoFinal);
+            console.log('[SALVAR] ValorTexto anterior:', novasLinhas[linhaIndex].valorTexto);
             setLinhas(tabela, novasLinhas);
           }
         }
@@ -732,6 +748,22 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     console.log('[BLUR] Campo perdeu foco:', campo, '| Linha:', linhaIndex, '| Tabela:', tabela);
     console.log('[BLUR] Estado - tabPressionado:', tabPressionado);
     console.log('[BLUR] Estado - editando:', editando, '| campoEditando:', campoEditando, '| tabelaEditando:', tabelaEditando);
+    
+    // Se for o campo valor, garantir que o valor seja parseado antes de sair do modo de edição
+    if (campo === 'valor') {
+      const linhas = getLinhas(tabela);
+      const linha = linhas[linhaIndex];
+      if (linha && linha.valorTexto) {
+        console.log('[BLUR] Campo valor - parseando valorTexto antes de salvar:', linha.valorTexto);
+        const valorParseado = parsearValor(linha.valorTexto);
+        console.log('[BLUR] Valor parseado:', valorParseado);
+        if (valorParseado !== null) {
+          // Atualizar o valor na linha antes de salvar
+          atualizarLinha(linhaIndex, 'valor', valorParseado, false, tabela);
+          console.log('[BLUR] Valor atualizado na linha antes de salvar');
+        }
+      }
+    }
     
     // Aguardar um pouco para verificar se Tab foi realmente pressionado
     // Isso evita que o blur interfira durante navegação com Tab
@@ -1026,7 +1058,16 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                     iniciarEdicao(linhaIndex, 'valor', tabela);
                   }}
                 >
-                  {linha.valor ? `R$ ${formatarValor(linha.valor)}` : '0,00'}
+                  {(() => {
+                    // Priorizar valorTexto se existir, senão formatar valor numérico
+                    if (linha.valorTexto !== undefined && linha.valorTexto !== null && linha.valorTexto !== '') {
+                      return `R$ ${linha.valorTexto}`;
+                    }
+                    if (linha.valor !== undefined && linha.valor !== null && linha.valor !== 0) {
+                      return `R$ ${formatarValor(linha.valor)}`;
+                    }
+                    return '0,00';
+                  })()}
                 </div>
               )}
             </div>
