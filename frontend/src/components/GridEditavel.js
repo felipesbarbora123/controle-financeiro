@@ -551,11 +551,14 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         // Parsear apenas quando sair do campo
         const valorParseado = parsearValor(valor);
         linha.valor = valorParseado;
-        // Manter valorTexto formatado para exibição
-        const valorFormatado = valorParseado !== null ? formatarValor(valorParseado) : null;
+        // SEMPRE manter valorTexto formatado para exibição, mesmo após parsear
+        const valorFormatado = valorParseado !== null && valorParseado !== undefined 
+          ? formatarValor(valorParseado) 
+          : (linha.valorTexto || null); // Manter o valorTexto anterior se o parse falhar
         linha.valorTexto = valorFormatado;
         console.log('[ATUALIZAR] Valor parseado:', valorParseado);
         console.log('[ATUALIZAR] ValorTexto formatado mantido:', valorFormatado);
+        console.log('[ATUALIZAR] Valor anterior na linha:', linha.valor);
         console.log('[ATUALIZAR] Linha após parsear valor:', JSON.parse(JSON.stringify(linha)));
       }
     } else if (campo === 'pago') {
@@ -749,7 +752,17 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     console.log('[BLUR] Estado - tabPressionado:', tabPressionado);
     console.log('[BLUR] Estado - editando:', editando, '| campoEditando:', campoEditando, '| tabelaEditando:', tabelaEditando);
     
-    // Se for o campo valor, garantir que o valor seja parseado antes de sair do modo de edição
+    // Aguardar um pouco para verificar se Tab foi realmente pressionado
+    // Isso evita que o blur interfira durante navegação com Tab
+    if (tabPressionado) {
+      console.log('[BLUR] ⚠️ Ignorando blur porque Tab foi pressionado');
+      console.log('[BLUR] A flag será resetada pelo handleKeyDown');
+      // Se for o campo valor e Tab foi pressionado, o valor já foi parseado no handleKeyDown
+      // Não fazer nada aqui, apenas retornar
+      return;
+    }
+    
+    // Se for o campo valor e Tab NÃO foi pressionado, garantir que o valor seja parseado
     if (campo === 'valor') {
       const linhas = getLinhas(tabela);
       const linha = linhas[linhaIndex];
@@ -758,28 +771,11 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         const valorParseado = parsearValor(linha.valorTexto);
         console.log('[BLUR] Valor parseado:', valorParseado);
         if (valorParseado !== null) {
-          // Atualizar o valor na linha antes de salvar
+          // Atualizar o valor na linha antes de salvar, mantendo valorTexto formatado
           atualizarLinha(linhaIndex, 'valor', valorParseado, false, tabela);
           console.log('[BLUR] Valor atualizado na linha antes de salvar');
         }
       }
-    }
-    
-    // Aguardar um pouco para verificar se Tab foi realmente pressionado
-    // Isso evita que o blur interfira durante navegação com Tab
-    if (tabPressionado) {
-      console.log('[BLUR] ⚠️ Ignorando blur porque Tab foi pressionado');
-      console.log('[BLUR] A flag será resetada pelo handleKeyDown');
-      // Aguardar um pouco e verificar novamente
-      setTimeout(() => {
-        if (!tabPressionado) {
-          console.log('[BLUR] Tab não estava ativo, salvando após delay');
-          salvarLinha(linhaIndex, false, true, tabela).then(() => {
-            finalizarEdicao();
-          });
-        }
-      }, 200);
-      return;
     }
     
     console.log('[BLUR] ✅ Processando blur normal - salvando linha');
@@ -851,6 +847,30 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       
       console.log('[KEYDOWN] Campo atual:', campo, '| Índice:', campoAtual);
       console.log('[KEYDOWN] Total de campos:', campos.length);
+      
+      // Se for o campo valor, parsear e manter o valor formatado antes de navegar
+      if (campo === 'valor') {
+        const linhasAtual = getLinhas(tabela);
+        const linhaAtual = linhasAtual[linhaIndex];
+        if (linhaAtual && linhaAtual.valorTexto) {
+          console.log('[KEYDOWN] Campo valor - parseando valorTexto antes de navegar:', linhaAtual.valorTexto);
+          const valorParseado = parsearValor(linhaAtual.valorTexto);
+          console.log('[KEYDOWN] Valor parseado:', valorParseado);
+          if (valorParseado !== null) {
+            // Atualizar o valor na linha mantendo o valorTexto formatado
+            // Usar salvarValorBruto=false para parsear, mas manter o valorTexto formatado
+            atualizarLinha(linhaIndex, 'valor', valorParseado, false, tabela);
+            console.log('[KEYDOWN] Valor atualizado na linha antes de navegar');
+            // Verificar se o valorTexto foi mantido
+            const linhasAposAtualizar = getLinhas(tabela);
+            const linhaAposAtualizar = linhasAposAtualizar[linhaIndex];
+            console.log('[KEYDOWN] Linha após atualizar valor:', JSON.parse(JSON.stringify({
+              valor: linhaAposAtualizar?.valor,
+              valorTexto: linhaAposAtualizar?.valorTexto
+            })));
+          }
+        }
+      }
       
       // NÃO salvar durante Tab para evitar perda de foco
       // O salvamento será feito no blur
@@ -1060,13 +1080,20 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                 >
                   {(() => {
                     // Priorizar valorTexto se existir, senão formatar valor numérico
-                    if (linha.valorTexto !== undefined && linha.valorTexto !== null && linha.valorTexto !== '') {
-                      return `R$ ${linha.valorTexto}`;
-                    }
-                    if (linha.valor !== undefined && linha.valor !== null && linha.valor !== 0) {
-                      return `R$ ${formatarValor(linha.valor)}`;
-                    }
-                    return '0,00';
+                    const valorExibido = (() => {
+                      if (linha.valorTexto !== undefined && linha.valorTexto !== null && linha.valorTexto !== '') {
+                        console.log('[RENDER] Campo valor - usando valorTexto:', linha.valorTexto);
+                        return `R$ ${linha.valorTexto}`;
+                      }
+                      if (linha.valor !== undefined && linha.valor !== null && linha.valor !== 0) {
+                        const valorFormatado = formatarValor(linha.valor);
+                        console.log('[RENDER] Campo valor - formatando valor numérico:', linha.valor, '->', valorFormatado);
+                        return `R$ ${valorFormatado}`;
+                      }
+                      console.log('[RENDER] Campo valor - sem valor, mostrando 0,00');
+                      return '0,00';
+                    })();
+                    return valorExibido;
                   })()}
                 </div>
               )}
