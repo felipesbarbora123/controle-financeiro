@@ -903,42 +903,64 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           console.log('[KEYDOWN] Gasto salvo após campo retroativo');
           
           // Aguardar que os gastos sejam recarregados e a nova linha vazia seja criada
-          // Usar um intervalo para verificar quando a nova linha aparecer
+          // O useEffect sempre adiciona uma linha vazia no final, então vamos aguardar isso
           let tentativas = 0;
-          const maxTentativas = 20; // Máximo de 2 segundos (20 * 100ms)
+          const maxTentativas = 30; // Máximo de 3 segundos (30 * 100ms)
           
           const verificarNovaLinha = () => {
             const linhasAtualizadas = getLinhas(tabela);
             console.log('[KEYDOWN] Verificando linhas (tentativa', tentativas + 1, '):', linhasAtualizadas.length);
             
-            // Verificar se há uma nova linha vazia (sem id) após a linha atual
-            const temNovaLinha = linhasAtualizadas.length > linhaIndex + 1 || 
-                                 (linhasAtualizadas.length > 0 && 
-                                  linhasAtualizadas[linhasAtualizadas.length - 1]?.id === null);
-            
-            if (temNovaLinha || tentativas >= maxTentativas) {
-              // Encontrou nova linha ou atingiu limite de tentativas
-              const proximaLinhaIndex = linhasAtualizadas.length - 1;
-              console.log('[KEYDOWN] Navegando para próxima linha (índice):', proximaLinhaIndex);
+            // A última linha sempre é a linha vazia (adicionada pelo useEffect)
+            // Verificar se há pelo menos uma linha e se a última é vazia (sem id)
+            if (linhasAtualizadas.length > 0) {
+              const ultimaLinha = linhasAtualizadas[linhasAtualizadas.length - 1];
+              const ultimaLinhaIndex = linhasAtualizadas.length - 1;
               
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  iniciarEdicao(proximaLinhaIndex, campos[0], tabela); // Focar no campo data
+              // Verificar se a última linha é vazia (sem id) ou se já passou tempo suficiente
+              if ((ultimaLinha && ultimaLinha.id === null) || tentativas >= maxTentativas) {
+                console.log('[KEYDOWN] Navegando para última linha (índice):', ultimaLinhaIndex, '| Linha vazia:', ultimaLinha?.id === null);
+                
+                requestAnimationFrame(() => {
                   setTimeout(() => {
-                    console.log('[KEYDOWN] Resetando flag tabPressionado após navegação para próxima linha');
-                    setTabPressionado(false);
-                  }, 150);
-                }, 100);
-              });
-            } else {
-              // Ainda não apareceu, tentar novamente
+                    // Sempre focar no campo "data" (primeiro campo) da última linha
+                    iniciarEdicao(ultimaLinhaIndex, 'data', tabela);
+                    setTimeout(() => {
+                      console.log('[KEYDOWN] Resetando flag tabPressionado após navegação para próxima linha');
+                      setTabPressionado(false);
+                    }, 150);
+                  }, 100);
+                });
+                return; // Sair da função
+              }
+            }
+            
+            // Ainda não apareceu, tentar novamente
+            if (tentativas < maxTentativas) {
               tentativas++;
               setTimeout(verificarNovaLinha, 100);
+            } else {
+              // Atingiu limite, tentar mesmo assim com a última linha disponível
+              const linhasFinais = getLinhas(tabela);
+              if (linhasFinais.length > 0) {
+                const ultimaIndex = linhasFinais.length - 1;
+                console.log('[KEYDOWN] Limite atingido, navegando para última linha disponível (índice):', ultimaIndex);
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    iniciarEdicao(ultimaIndex, 'data', tabela);
+                    setTimeout(() => {
+                      setTabPressionado(false);
+                    }, 150);
+                  }, 100);
+                });
+              } else {
+                setTabPressionado(false);
+              }
             }
           };
           
-          // Iniciar verificação após um pequeno delay
-          setTimeout(verificarNovaLinha, 200);
+          // Iniciar verificação após um pequeno delay para dar tempo do useEffect executar
+          setTimeout(verificarNovaLinha, 300);
         }).catch(err => {
           console.error('[KEYDOWN] Erro ao salvar após campo retroativo:', err);
           setTabPressionado(false);
