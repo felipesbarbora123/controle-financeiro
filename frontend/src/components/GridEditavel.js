@@ -804,8 +804,8 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       setTabPressionado(true);
       console.log('[KEYDOWN] Flag tabPressionado alterada de', tabAnterior, 'para true');
       
-      // Ordem dos campos: data, descricao, valor, observacao, pago
-      const campos = ['data', 'descricao', 'valor', 'observacao', 'pago'];
+      // Ordem dos campos: data, descricao, valor, observacao, pago, retroativo
+      const campos = ['data', 'descricao', 'valor', 'observacao', 'pago', 'retroativo'];
       const campoAtual = campos.indexOf(campo);
       
       // Verificar se campoAtual é válido
@@ -842,34 +842,53 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
           }, 50);
         });
       } else {
-        // Se está no último campo (pago), ir para próxima linha
-        console.log('[KEYDOWN] Último campo, verificando próxima linha');
-        if (linhaIndex < linhas.length - 1) {
-          // Já existe próxima linha, ir para ela
-          console.log('[KEYDOWN] Navegando para próxima linha:', linhaIndex + 1);
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              iniciarEdicao(linhaIndex + 1, campos[0], tabela);
-              setTimeout(() => {
-                console.log('[KEYDOWN] Resetando flag tabPressionado após navegação para próxima linha');
-                setTabPressionado(false);
-              }, 150);
-            }, 50);
-          });
-        } else {
-          // Está na última linha e último campo - salvar antes de finalizar
-          console.log('[KEYDOWN] Última linha da tabela, salvando antes de finalizar');
-          // Salvar a linha atual antes de finalizar
-          salvarLinha(linhaIndex, false, true, tabela).then(() => {
-            console.log('[KEYDOWN] Gasto salvo, finalizando edição');
-            finalizarEdicao();
-            setTabPressionado(false);
-          }).catch(err => {
-            console.error('[KEYDOWN] Erro ao salvar na última linha:', err);
-            finalizarEdicao();
-            setTabPressionado(false);
-          });
-        }
+        // Se está no último campo (retroativo), salvar e ir para próxima linha
+        console.log('[KEYDOWN] Último campo (retroativo), salvando e verificando próxima linha');
+        // Salvar a linha atual antes de navegar
+        salvarLinha(linhaIndex, false, true, tabela).then(() => {
+          console.log('[KEYDOWN] Gasto salvo após campo retroativo');
+          
+          // Aguardar que os gastos sejam recarregados e a nova linha vazia seja criada
+          // Usar um intervalo para verificar quando a nova linha aparecer
+          let tentativas = 0;
+          const maxTentativas = 20; // Máximo de 2 segundos (20 * 100ms)
+          
+          const verificarNovaLinha = () => {
+            const linhasAtualizadas = getLinhas(tabela);
+            console.log('[KEYDOWN] Verificando linhas (tentativa', tentativas + 1, '):', linhasAtualizadas.length);
+            
+            // Verificar se há uma nova linha vazia (sem id) após a linha atual
+            const temNovaLinha = linhasAtualizadas.length > linhaIndex + 1 || 
+                                 (linhasAtualizadas.length > 0 && 
+                                  linhasAtualizadas[linhasAtualizadas.length - 1]?.id === null);
+            
+            if (temNovaLinha || tentativas >= maxTentativas) {
+              // Encontrou nova linha ou atingiu limite de tentativas
+              const proximaLinhaIndex = linhasAtualizadas.length - 1;
+              console.log('[KEYDOWN] Navegando para próxima linha (índice):', proximaLinhaIndex);
+              
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  iniciarEdicao(proximaLinhaIndex, campos[0], tabela); // Focar no campo data
+                  setTimeout(() => {
+                    console.log('[KEYDOWN] Resetando flag tabPressionado após navegação para próxima linha');
+                    setTabPressionado(false);
+                  }, 150);
+                }, 100);
+              });
+            } else {
+              // Ainda não apareceu, tentar novamente
+              tentativas++;
+              setTimeout(verificarNovaLinha, 100);
+            }
+          };
+          
+          // Iniciar verificação após um pequeno delay
+          setTimeout(verificarNovaLinha, 200);
+        }).catch(err => {
+          console.error('[KEYDOWN] Erro ao salvar após campo retroativo:', err);
+          setTabPressionado(false);
+        });
       }
       console.log('[KEYDOWN] ═══ FIM DO PROCESSAMENTO DO TAB ═══');
     }
@@ -1064,7 +1083,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   value={linha.retroativo ? 'sim' : 'nao'}
                   onChange={(e) => {
                     atualizarLinha(linhaIndex, 'retroativo', e.target.value === 'sim', false, tabela);
-                    salvarLinha(linhaIndex, false, true, tabela);
+                    // Não salvar automaticamente - será salvo ao sair do campo com Tab
                   }}
                   onBlur={() => handleLinhaBlur(linhaIndex, 'retroativo', tabela)}
                   onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'retroativo', tabela)}
