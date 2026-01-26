@@ -608,8 +608,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     }
     
     // Validar se tem pelo menos descrição ou data
-    if (!forcarSalvar && !linhaParaSalvar.descricao && !linhaParaSalvar.data) {
-      console.log('[SALVAR] ⚠️ Linha vazia, não salvando');
+    // Mas permitir salvar se o gasto já existe (tem id) - para atualizar campos como retroativo
+    if (!forcarSalvar && !linhaParaSalvar.id && !linhaParaSalvar.descricao && !linhaParaSalvar.data) {
+      console.log('[SALVAR] ⚠️ Linha vazia sem ID, não salvando');
       return;
     }
 
@@ -640,6 +641,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     console.log('  - Valor:', dadosParaSalvar.valor);
     console.log('  - Observação:', dadosParaSalvar.observacao);
     console.log('  - Pago:', dadosParaSalvar.pago);
+    console.log('  - Retroativo:', dadosParaSalvar.retroativo);
     console.log('  - Restaurante ID:', dadosParaSalvar.restaurante_id);
 
     // Verificar se a data pertence à semana correta após salvar
@@ -1083,7 +1085,8 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   value={linha.retroativo ? 'sim' : 'nao'}
                   onChange={(e) => {
                     atualizarLinha(linhaIndex, 'retroativo', e.target.value === 'sim', false, tabela);
-                    // Não salvar automaticamente - será salvo ao sair do campo com Tab
+                    // Salvar automaticamente quando o valor mudar, similar ao campo pago
+                    salvarLinha(linhaIndex, false, true, tabela);
                   }}
                   onBlur={() => handleLinhaBlur(linhaIndex, 'retroativo', tabela)}
                   onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'retroativo', tabela)}

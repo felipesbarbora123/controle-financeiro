@@ -152,6 +152,7 @@ function App() {
           valor: gasto.valor !== undefined && gasto.valor !== null ? gasto.valor : null,
           observacao: gasto.observacao || '',
           pago: gasto.pago !== undefined ? gasto.pago : false,
+          retroativo: gasto.retroativo !== undefined ? gasto.retroativo : false,
           restaurante_id: gasto.restaurante_id || restauranteSelecionado
         };
         console.log(`[APP] Gasto ${index + 1} processado:`, JSON.parse(JSON.stringify(gastoProcessado)));
