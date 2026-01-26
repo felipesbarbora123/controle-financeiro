@@ -297,6 +297,49 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     setLinhasProximaSemana(linhasProximaComVazia);
   }, [gastosSemanaAtual, gastosProximaSemana, restauranteId]);
 
+  // useEffect para focar no input quando a edição iniciar
+  useEffect(() => {
+    if (editando !== null && campoEditando && tabelaEditando) {
+      // Aguardar um pouco para garantir que o DOM foi atualizado
+      const timeoutId = setTimeout(() => {
+        // Usar os atributos data-* que adicionamos aos inputs
+        const seletor = `[data-linha="${editando}"][data-campo="${campoEditando}"][data-tabela="${tabelaEditando}"]`;
+        
+        console.log('[USE_EFFECT_FOCUS] Tentando focar no input:', seletor);
+        const input = document.querySelector(seletor);
+        
+        if (input) {
+          console.log('[USE_EFFECT_FOCUS] ✅ Input encontrado, focando...');
+          input.focus();
+          // Selecionar todo o texto se houver e for um input de texto
+          if (input.select && input.type === 'text') {
+            input.select();
+          }
+          // Scroll para o elemento se necessário
+          input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          console.log('[USE_EFFECT_FOCUS] ⚠️ Input não encontrado com seletor:', seletor);
+          // Tentar uma abordagem alternativa: buscar por classe e posição
+          const tabelaSelector = tabelaEditando === 'atual' ? '.tabela-semana-atual' : '.tabela-proxima-semana';
+          const linhas = document.querySelectorAll(`${tabelaSelector} .grid-row`);
+          if (linhas[editando]) {
+            const campoInput = linhas[editando].querySelector(`[data-label="${campoEditando.charAt(0).toUpperCase() + campoEditando.slice(1)}"] input, [data-label="${campoEditando.charAt(0).toUpperCase() + campoEditando.slice(1)}"] select`);
+            if (campoInput) {
+              console.log('[USE_EFFECT_FOCUS] ✅ Input encontrado com seletor alternativo, focando...');
+              campoInput.focus();
+              if (campoInput.select && campoInput.type === 'text') {
+                campoInput.select();
+              }
+              campoInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        }
+      }, 100); // Aumentar delay para garantir que o DOM foi atualizado
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [editando, campoEditando, tabelaEditando]);
+
   const formatarData = (data) => {
     if (!data) return '';
     // Se já está no formato YYYY-MM-DD (do banco), converter para DD/MM/YYYY
@@ -1025,6 +1068,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   className="grid-input"
                   placeholder="DD/MM/AAAA"
                   maxLength={10}
+                  data-linha={linhaIndex}
+                  data-campo="data"
+                  data-tabela={tabela}
                 />
               ) : (
                 <div
@@ -1055,6 +1101,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   autoFocus
                   className="grid-input"
                   placeholder="Digite a descrição"
+                  data-linha={linhaIndex}
+                  data-campo="descricao"
+                  data-tabela={tabela}
                 />
               ) : (
                 <div
@@ -1085,6 +1134,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   className="grid-input"
                   placeholder="0,00"
                   inputMode="decimal"
+                  data-linha={linhaIndex}
+                  data-campo="valor"
+                  data-tabela={tabela}
                 />
               ) : (
                 <div
@@ -1132,6 +1184,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   autoFocus
                   className="grid-input"
                   placeholder="Observações"
+                  data-linha={linhaIndex}
+                  data-campo="observacao"
+                  data-tabela={tabela}
                 />
               ) : (
                 <div
@@ -1155,6 +1210,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'pago', tabela)}
                   autoFocus
                   className="grid-input"
+                  data-linha={linhaIndex}
+                  data-campo="pago"
+                  data-tabela={tabela}
                 >
                   <option value="nao">Não</option>
                   <option value="sim">Sim</option>
@@ -1182,6 +1240,9 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
                   onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'retroativo', tabela)}
                   autoFocus
                   className="grid-input"
+                  data-linha={linhaIndex}
+                  data-campo="retroativo"
+                  data-tabela={tabela}
                 >
                   <option value="nao">Não</option>
                   <option value="sim">Sim</option>
