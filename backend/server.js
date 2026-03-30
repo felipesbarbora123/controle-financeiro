@@ -11,6 +11,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
 
+/** Usuários com somente_estoque=true não acessam rotas financeiras (gastos). */
+const requireFinanceiroAccess = (req, res, next) => {
+  if (req.user && req.user.somente_estoque === true) {
+    return res.status(403).json({ error: 'Acesso ao módulo financeiro não permitido para este perfil.' });
+  }
+  next();
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user || !req.user.is_admin) {
+    return res.status(403).json({ error: 'Apenas administradores podem realizar esta ação.' });
+  }
+  next();
+};
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -86,8 +101,14 @@ app.post('/api/login', async (req, res) => {
     }
 
     console.log('Senha válida, gerando token...');
+    const somenteEstoque = !!user.somente_estoque;
     const token = jwt.sign(
-      { id: user.id, username: user.username, is_admin: user.is_admin },
+      {
+        id: user.id,
+        username: user.username,
+        is_admin: user.is_admin,
+        somente_estoque: somenteEstoque
+      },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -99,7 +120,8 @@ app.post('/api/login', async (req, res) => {
         id: user.id,
         username: user.username,
         nome: user.nome,
-        is_admin: user.is_admin
+        is_admin: user.is_admin,
+        somente_estoque: somenteEstoque
       }
     });
   } catch (error) {
@@ -115,7 +137,10 @@ app.post('/api/login', async (req, res) => {
 // Verify token
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, nome, is_admin FROM usuarios WHERE id = $1', [req.user.id]);
+    const result = await pool.query(
+      'SELECT id, username, nome, is_admin, COALESCE(somente_estoque, false) AS somente_estoque FROM usuarios WHERE id = $1',
+      [req.user.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
@@ -157,7 +182,7 @@ app.get('/api/restaurantes/:id', authenticateToken, async (req, res) => {
 });
 
 // Create restaurant
-app.post('/api/restaurantes', authenticateToken, async (req, res) => {
+app.post('/api/restaurantes', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { nome, endereco, telefone, email, cnpj, observacoes } = req.body;
     
@@ -177,7 +202,7 @@ app.post('/api/restaurantes', authenticateToken, async (req, res) => {
 });
 
 // Update restaurant
-app.put('/api/restaurantes/:id', authenticateToken, async (req, res) => {
+app.put('/api/restaurantes/:id', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, endereco, telefone, email, cnpj, observacoes, ativo } = req.body;
@@ -201,7 +226,7 @@ app.put('/api/restaurantes/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete restaurant (soft delete - marca como inativo)
-app.delete('/api/restaurantes/:id', authenticateToken, async (req, res) => {
+app.delete('/api/restaurantes/:id', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -219,7 +244,7 @@ app.delete('/api/restaurantes/:id', authenticateToken, async (req, res) => {
 });
 
 // Get all expenses (now filtered by restaurante_id if provided)
-app.get('/api/gastos', authenticateToken, async (req, res) => {
+app.get('/api/gastos', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { restaurante_id } = req.query;
     let query = 'SELECT * FROM gastos';
@@ -266,7 +291,7 @@ app.get('/api/gastos', authenticateToken, async (req, res) => {
 });
 
 // Get single expense
-app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
+app.get('/api/gastos/:id', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query('SELECT * FROM gastos WHERE id = $1', [id]);
@@ -302,7 +327,7 @@ app.get('/api/gastos/:id', authenticateToken, async (req, res) => {
 });
 
 // Create expense
-app.post('/api/gastos', authenticateToken, async (req, res) => {
+app.post('/api/gastos', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { data, descricao, valor, observacao, pago, retroativo, restaurante_id } = req.body;
     
@@ -343,7 +368,7 @@ app.post('/api/gastos', authenticateToken, async (req, res) => {
 });
 
 // Update expense
-app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
+app.put('/api/gastos/:id', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const { data, descricao, valor, observacao, pago, retroativo, restaurante_id } = req.body;
@@ -383,7 +408,7 @@ app.put('/api/gastos/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete expense
-app.delete('/api/gastos/:id', authenticateToken, async (req, res) => {
+app.delete('/api/gastos/:id', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query('DELETE FROM gastos WHERE id = $1 RETURNING *', [id]);
@@ -398,7 +423,7 @@ app.delete('/api/gastos/:id', authenticateToken, async (req, res) => {
 });
 
 // Bulk update (for grid editing)
-app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
+app.put('/api/gastos/bulk', authenticateToken, requireFinanceiroAccess, async (req, res) => {
   try {
     const { gastos } = req.body;
     const client = await pool.connect();
@@ -436,6 +461,207 @@ app.put('/api/gastos/bulk', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Erro ao atualizar gastos em lote:', error);
     res.status(500).json({ error: 'Erro ao atualizar gastos em lote' });
+  }
+});
+
+// ========== Módulo Estoque ==========
+
+// Lista categorias + produtos agrupados (todos autenticados)
+app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
+  try {
+    const { restaurante_id } = req.query;
+    if (!restaurante_id) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    const rid = parseInt(restaurante_id, 10);
+    if (Number.isNaN(rid)) {
+      return res.status(400).json({ error: 'restaurante_id inválido' });
+    }
+
+    const catResult = await pool.query(
+      `SELECT id, restaurante_id, nome, ordem
+       FROM estoque_categorias
+       WHERE restaurante_id = $1
+       ORDER BY ordem ASC, nome ASC`,
+      [rid]
+    );
+
+    const prodResult = await pool.query(
+      `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade, p.created_at, p.updated_at
+       FROM estoque_produtos p
+       WHERE p.restaurante_id = $1
+       ORDER BY p.nome ASC`,
+      [rid]
+    );
+
+    const produtosPorCat = {};
+    prodResult.rows.forEach((p) => {
+      if (!produtosPorCat[p.categoria_id]) produtosPorCat[p.categoria_id] = [];
+      produtosPorCat[p.categoria_id].push(p);
+    });
+
+    const categorias = catResult.rows.map((c) => ({
+      ...c,
+      produtos: produtosPorCat[c.id] || []
+    }));
+
+    res.json({ restaurante_id: rid, categorias });
+  } catch (error) {
+    console.error('Erro ao listar estoque agrupado:', error);
+    res.status(500).json({ error: 'Erro ao listar estoque' });
+  }
+});
+
+// CRUD categorias (somente admin)
+app.post('/api/estoque/categorias', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { restaurante_id, nome, ordem } = req.body;
+    if (!restaurante_id || !nome || String(nome).trim() === '') {
+      return res.status(400).json({ error: 'restaurante_id e nome são obrigatórios' });
+    }
+    const result = await pool.query(
+      `INSERT INTO estoque_categorias (restaurante_id, nome, ordem)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [restaurante_id, String(nome).trim(), ordem !== undefined ? ordem : 0]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Já existe uma categoria com este nome neste restaurante.' });
+    }
+    console.error('Erro ao criar categoria:', error);
+    res.status(500).json({ error: 'Erro ao criar categoria' });
+  }
+});
+
+app.put('/api/estoque/categorias/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, ordem } = req.body;
+    if (!nome || String(nome).trim() === '') {
+      return res.status(400).json({ error: 'nome é obrigatório' });
+    }
+    const result = await pool.query(
+      `UPDATE estoque_categorias
+       SET nome = $1, ordem = COALESCE($2, ordem), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [String(nome).trim(), ordem, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar categoria:', error);
+    res.status(500).json({ error: 'Erro ao atualizar categoria' });
+  }
+});
+
+app.delete('/api/estoque/categorias/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM estoque_categorias WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+    res.json({ message: 'Categoria removida', id: result.rows[0].id });
+  } catch (error) {
+    console.error('Erro ao remover categoria:', error);
+    res.status(500).json({ error: 'Erro ao remover categoria' });
+  }
+});
+
+// CRUD produtos
+app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { restaurante_id, categoria_id, nome, unidade, quantidade } = req.body;
+    if (!restaurante_id || !categoria_id || !nome || String(nome).trim() === '') {
+      return res.status(400).json({ error: 'restaurante_id, categoria_id e nome são obrigatórios' });
+    }
+    const un = unidade && String(unidade).trim() !== '' ? String(unidade).trim().slice(0, 20) : 'un';
+    const qtd = quantidade !== undefined && quantidade !== null ? quantidade : 0;
+    const result = await pool.query(
+      `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [restaurante_id, categoria_id, String(nome).trim(), un, qtd]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Já existe um produto com este nome nesta categoria.' });
+    }
+    console.error('Erro ao criar produto:', error);
+    res.status(500).json({ error: 'Erro ao criar produto' });
+  }
+});
+
+app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+    const isAdmin = !!req.user.is_admin;
+
+    const existing = await pool.query('SELECT * FROM estoque_produtos WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+
+    if (isAdmin) {
+      const row = existing.rows[0];
+      const categoria_id = body.categoria_id !== undefined ? body.categoria_id : row.categoria_id;
+      const nome =
+        body.nome !== undefined && String(body.nome).trim() !== ''
+          ? String(body.nome).trim()
+          : row.nome;
+      const unidade =
+        body.unidade !== undefined && String(body.unidade).trim() !== ''
+          ? String(body.unidade).trim().slice(0, 20)
+          : row.unidade;
+      const quantidade =
+        body.quantidade !== undefined && body.quantidade !== null ? body.quantidade : row.quantidade;
+      const result = await pool.query(
+        `UPDATE estoque_produtos
+         SET categoria_id = $1, nome = $2, unidade = $3, quantidade = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5
+         RETURNING *`,
+        [categoria_id, nome, unidade, quantidade, id]
+      );
+      return res.json(result.rows[0]);
+    }
+
+    // Não-admin: apenas quantidade
+    if (body.quantidade === undefined || body.quantidade === null) {
+      return res.status(400).json({ error: 'Informe quantidade para atualizar.' });
+    }
+    const q = parseFloat(body.quantidade);
+    if (Number.isNaN(q)) {
+      return res.status(400).json({ error: 'quantidade inválida' });
+    }
+    const result = await pool.query(
+      `UPDATE estoque_produtos SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [q, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar produto:', error);
+    res.status(500).json({ error: 'Erro ao atualizar produto' });
+  }
+});
+
+app.delete('/api/estoque/produtos/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM estoque_produtos WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+    res.json({ message: 'Produto removido', id: result.rows[0].id });
+  } catch (error) {
+    console.error('Erro ao remover produto:', error);
+    res.status(500).json({ error: 'Erro ao remover produto' });
   }
 });
 

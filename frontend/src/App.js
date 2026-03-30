@@ -5,6 +5,7 @@ import GridEditavel from './components/GridEditavel';
 import Login from './components/Login';
 import CadastroRestaurantes from './components/CadastroRestaurantes';
 import Relatorios from './components/Relatorios';
+import Estoque from './components/Estoque';
 import { API_URL } from './config';
 
 // Configurar axios para incluir token em todas as requisições
@@ -43,7 +44,15 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [telaAtual, setTelaAtual] = useState('gastos'); // 'gastos', 'restaurantes' ou 'relatorios'
+  const [telaAtual, setTelaAtual] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      return u.somente_estoque ? 'estoque' : 'gastos';
+    } catch {
+      return 'gastos';
+    }
+  }); // 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
+  const [msgEstoque, setMsgEstoque] = useState(null);
 
   useEffect(() => {
     verificarAutenticacao();
@@ -55,15 +64,31 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  // Perfil somente estoque: abrir direto no módulo de estoque
+  useEffect(() => {
+    if (user?.somente_estoque) {
+      setTelaAtual('estoque');
+    }
+  }, [user]);
+
+  // Perfil somente estoque não carrega gastos — liberar tela de loading
+  useEffect(() => {
+    if (isAuthenticated && user?.somente_estoque) {
+      setLoading(false);
+    }
+  }, [isAuthenticated, user]);
+
   useEffect(() => {
     if (isAuthenticated && restaurantes.length > 0) {
       // Selecionar primeiro restaurante se nenhum estiver selecionado
       if (!restauranteSelecionado) {
         setRestauranteSelecionado(restaurantes[0].id);
       }
-      carregarGastos();
+      if (user && !user.somente_estoque) {
+        carregarGastos();
+      }
     }
-  }, [isAuthenticated, restauranteSelecionado, restaurantes]);
+  }, [isAuthenticated, restauranteSelecionado, restaurantes, user]);
 
   const verificarAutenticacao = async () => {
     const token = localStorage.getItem('token');
@@ -247,7 +272,9 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  if (loading) {
+  const somenteEstoque = !!user?.somente_estoque;
+
+  if (loading && !somenteEstoque) {
     return (
       <div className="app">
         <div className="loading">Carregando...</div>
@@ -268,33 +295,47 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>Controle Financeiro - Multi Restaurante</h1>
+          <h1>{somenteEstoque ? 'Estoque' : 'Controle Financeiro - Multi Restaurante'}</h1>
           {user && (
             <p className="user-info">Olá, {user.nome}!</p>
           )}
         </div>
         <div className="header-actions">
           <div className="nav-tabs">
+            {!somenteEstoque && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTelaAtual('gastos')}
+                  className={telaAtual === 'gastos' ? 'nav-tab active' : 'nav-tab'}
+                >
+                  Gastos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTelaAtual('relatorios')}
+                  className={telaAtual === 'relatorios' ? 'nav-tab active' : 'nav-tab'}
+                >
+                  Relatórios
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTelaAtual('restaurantes')}
+                  className={telaAtual === 'restaurantes' ? 'nav-tab active' : 'nav-tab'}
+                >
+                  Restaurantes
+                </button>
+              </>
+            )}
             <button
-              onClick={() => setTelaAtual('gastos')}
-              className={telaAtual === 'gastos' ? 'nav-tab active' : 'nav-tab'}
+              type="button"
+              onClick={() => setTelaAtual('estoque')}
+              className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
             >
-              Gastos
-            </button>
-            <button
-              onClick={() => setTelaAtual('relatorios')}
-              className={telaAtual === 'relatorios' ? 'nav-tab active' : 'nav-tab'}
-            >
-              Relatórios
-            </button>
-            <button
-              onClick={() => setTelaAtual('restaurantes')}
-              className={telaAtual === 'restaurantes' ? 'nav-tab active' : 'nav-tab'}
-            >
-              Restaurantes
+              Estoque
             </button>
           </div>
-          {telaAtual === 'gastos' && restaurantes.length > 0 && (
+          {(telaAtual === 'gastos' || telaAtual === 'estoque' || somenteEstoque) && restaurantes.length > 0 && (
             <select
               value={restauranteSelecionado || ''}
               onChange={handleRestauranteChange}
@@ -307,12 +348,12 @@ function App() {
               ))}
             </select>
           )}
-          {telaAtual === 'gastos' && (
-            <button onClick={carregarGastos} className="btn-refresh">
+          {telaAtual === 'gastos' && !somenteEstoque && (
+            <button type="button" onClick={carregarGastos} className="btn-refresh">
               Atualizar
             </button>
           )}
-          <button onClick={handleLogout} className="btn-logout">
+          <button type="button" onClick={handleLogout} className="btn-logout">
             Sair
           </button>
         </div>
@@ -323,13 +364,30 @@ function App() {
           {error}
         </div>
       )}
+      {msgEstoque && (
+        <div className="error-message" role="status">
+          {msgEstoque}
+        </div>
+      )}
 
       <main className="app-main">
-        {telaAtual === 'gastos' ? (
+        {telaAtual === 'estoque' ? (
+          restaurantes.length === 0 ? (
+            <div className="empty-state">
+              <p>Nenhum restaurante disponível. Peça ao administrador para cadastrar um restaurante.</p>
+            </div>
+          ) : (
+            <Estoque
+              restauranteId={restauranteSelecionado}
+              isAdmin={!!user?.is_admin}
+              onMessage={setMsgEstoque}
+            />
+          )
+        ) : telaAtual === 'gastos' ? (
           restaurantes.length === 0 ? (
             <div className="empty-state">
               <p>Nenhum restaurante cadastrado. Por favor, cadastre um restaurante primeiro.</p>
-              <button onClick={() => setTelaAtual('restaurantes')} className="btn-primary">
+              <button type="button" onClick={() => setTelaAtual('restaurantes')} className="btn-primary">
                 Cadastrar Restaurante
               </button>
             </div>
