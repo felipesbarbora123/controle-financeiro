@@ -7,6 +7,7 @@ import CadastroRestaurantes from './components/CadastroRestaurantes';
 import Relatorios from './components/Relatorios';
 import EstoqueShell from './components/estoque/EstoqueShell';
 import AdminDashboard from './components/AdminDashboard';
+import AdminUsuariosEstoque from './components/AdminUsuariosEstoque';
 import { API_URL } from './config';
 
 // Configurar axios para incluir token em todas as requisições
@@ -100,6 +101,15 @@ function App() {
       }
     }
   }, [isAuthenticated, restauranteSelecionado, restaurantes, user]);
+
+  // Usuário somente estoque: se o restaurante atual saiu da lista permitida, voltar ao primeiro
+  useEffect(() => {
+    if (restaurantes.length === 0 || restauranteSelecionado == null) return;
+    const ok = restaurantes.some((r) => r.id === restauranteSelecionado);
+    if (!ok) {
+      setRestauranteSelecionado(restaurantes[0].id);
+    }
+  }, [restaurantes, restauranteSelecionado]);
 
   const verificarAutenticacao = async () => {
     const token = localStorage.getItem('token');
@@ -369,6 +379,16 @@ function App() {
                 >
                   Restaurantes
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTelaAtual('usuarios_estoque');
+                    setError(null);
+                  }}
+                  className={telaAtual === 'usuarios_estoque' ? 'nav-tab active' : 'nav-tab'}
+                >
+                  Usuários estoque
+                </button>
               </>
             )}
             <button
@@ -429,6 +449,10 @@ function App() {
             onIrParaRelatorios={() => setTelaAtual('relatorios')}
             onIrParaEstoque={(view) => irParaEstoque(view || 'visao')}
             onIrParaRestaurantes={() => setTelaAtual('restaurantes')}
+            onIrParaUsuariosEstoque={() => {
+              setError(null);
+              setTelaAtual('usuarios_estoque');
+            }}
           />
         ) : telaAtual === 'estoque' ? (
           restaurantes.length === 0 ? (
@@ -462,6 +486,8 @@ function App() {
           )
         ) : telaAtual === 'relatorios' ? (
           <Relatorios restauranteId={restauranteSelecionado} />
+        ) : telaAtual === 'usuarios_estoque' && isAdmin && !somenteEstoque ? (
+          <AdminUsuariosEstoque onError={(msg) => setError(msg)} />
         ) : (
           <CadastroRestaurantes onUpdate={handleRestaurantesUpdated} />
         )}

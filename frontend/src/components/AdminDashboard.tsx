@@ -19,6 +19,7 @@ interface Props {
   onIrParaRelatorios: () => void;
   onIrParaEstoque: (view?: 'visao' | 'categorias' | 'produtos') => void;
   onIrParaRestaurantes: () => void;
+  onIrParaUsuariosEstoque?: () => void;
 }
 
 function parseValor(v: string | number | null | undefined): number {
@@ -45,7 +46,8 @@ const AdminDashboard: React.FC<Props> = ({
   onIrParaGastos,
   onIrParaRelatorios,
   onIrParaEstoque,
-  onIrParaRestaurantes
+  onIrParaRestaurantes,
+  onIrParaUsuariosEstoque
 }) => {
   const [loadingEstoque, setLoadingEstoque] = useState(true);
   const [numCategorias, setNumCategorias] = useState(0);
@@ -192,6 +194,11 @@ const AdminDashboard: React.FC<Props> = ({
           <button type="button" className="admin-dashboard-chip" onClick={() => onIrParaEstoque('visao')}>
             Conferir estoque
           </button>
+          {onIrParaUsuariosEstoque && (
+            <button type="button" className="admin-dashboard-chip" onClick={onIrParaUsuariosEstoque}>
+              Usuários de estoque
+            </button>
+          )}
         </div>
       </section>
     </div>

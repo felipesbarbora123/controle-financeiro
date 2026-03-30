@@ -26,6 +26,54 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+/** Flags atuais do usuário (DB — não confiar só no JWT). */
+async function loadUserFlags(userId) {
+  const r = await pool.query(
+    'SELECT id, is_admin, COALESCE(somente_estoque, false) AS somente_estoque FROM usuarios WHERE id = $1',
+    [userId]
+  );
+  return r.rows[0] || null;
+}
+
+async function restauranteIdsUsuarioEstoque(userId) {
+  const r = await pool.query(
+    'SELECT restaurante_id FROM usuario_restaurante_estoque WHERE usuario_id = $1 ORDER BY restaurante_id',
+    [userId]
+  );
+  return r.rows.map((row) => row.restaurante_id);
+}
+
+async function usuarioSomenteEstoquePodeRestaurante(userId, restauranteId) {
+  const r = await pool.query(
+    'SELECT 1 FROM usuario_restaurante_estoque WHERE usuario_id = $1 AND restaurante_id = $2',
+    [userId, restauranteId]
+  );
+  return r.rows.length > 0;
+}
+
+/** Admin e usuários financeiros: qualquer restaurante. Somente estoque: só vinculados. */
+async function assertEstoqueAcessoRestaurante(req, res, restauranteId) {
+  const rid = parseInt(restauranteId, 10);
+  if (Number.isNaN(rid)) {
+    res.status(400).json({ error: 'restaurante_id inválido' });
+    return false;
+  }
+  const flags = await loadUserFlags(req.user.id);
+  if (!flags) {
+    res.status(403).json({ error: 'Usuário inválido.' });
+    return false;
+  }
+  if (flags.is_admin || !flags.somente_estoque) {
+    return true;
+  }
+  const ok = await usuarioSomenteEstoquePodeRestaurante(req.user.id, rid);
+  if (!ok) {
+    res.status(403).json({ error: 'Sem permissão para acessar o estoque deste restaurante.' });
+    return false;
+  }
+  return true;
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -114,6 +162,15 @@ app.post('/api/login', async (req, res) => {
     );
 
     console.log('Login bem-sucedido para:', username);
+    let restauranteIds = [];
+    if (somenteEstoque) {
+      const assoc = await pool.query(
+        'SELECT restaurante_id FROM usuario_restaurante_estoque WHERE usuario_id = $1 ORDER BY restaurante_id',
+        [user.id]
+      );
+      restauranteIds = assoc.rows.map((row) => row.restaurante_id);
+    }
+
     res.json({
       token,
       user: {
@@ -121,7 +178,8 @@ app.post('/api/login', async (req, res) => {
         username: user.username,
         nome: user.nome,
         is_admin: user.is_admin,
-        somente_estoque: somenteEstoque
+        somente_estoque: somenteEstoque,
+        restaurante_ids: restauranteIds
       }
     });
   } catch (error) {
@@ -144,7 +202,12 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-    res.json({ user: result.rows[0] });
+    const row = result.rows[0];
+    let restauranteIds = [];
+    if (row.somente_estoque) {
+      restauranteIds = await restauranteIdsUsuarioEstoque(row.id);
+    }
+    res.json({ user: { ...row, restaurante_ids: restauranteIds } });
   } catch (error) {
     console.error('Erro ao verificar token:', error);
     res.status(500).json({ error: 'Erro ao verificar token' });
@@ -156,6 +219,21 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
 // Get all restaurants
 app.get('/api/restaurantes', authenticateToken, async (req, res) => {
   try {
+    const flags = await loadUserFlags(req.user.id);
+    if (!flags) {
+      return res.status(403).json({ error: 'Usuário inválido.' });
+    }
+    if (flags.somente_estoque && !flags.is_admin) {
+      const result = await pool.query(
+        `SELECT r.*
+         FROM restaurantes r
+         INNER JOIN usuario_restaurante_estoque ur ON ur.restaurante_id = r.id AND ur.usuario_id = $1
+         WHERE r.ativo = true
+         ORDER BY r.nome ASC`,
+        [req.user.id]
+      );
+      return res.json(result.rows);
+    }
     const result = await pool.query(
       'SELECT * FROM restaurantes WHERE ativo = true ORDER BY nome ASC'
     );
@@ -170,6 +248,14 @@ app.get('/api/restaurantes', authenticateToken, async (req, res) => {
 app.get('/api/restaurantes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const rid = parseInt(id, 10);
+    const flags = await loadUserFlags(req.user.id);
+    if (flags && flags.somente_estoque && !flags.is_admin) {
+      const ok = await usuarioSomenteEstoquePodeRestaurante(req.user.id, rid);
+      if (!ok) {
+        return res.status(403).json({ error: 'Sem acesso a este restaurante.' });
+      }
+    }
     const result = await pool.query('SELECT * FROM restaurantes WHERE id = $1', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Restaurante não encontrado' });
@@ -478,6 +564,9 @@ app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'restaurante_id inválido' });
     }
 
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+    if (!pode) return;
+
     const catResult = await pool.query(
       `SELECT id, restaurante_id, nome, ordem
        FROM estoque_categorias
@@ -609,6 +698,10 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
+    const rowRestId = existing.rows[0].restaurante_id;
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rowRestId);
+    if (!pode) return;
+
     if (isAdmin) {
       const row = existing.rows[0];
       const categoria_id = body.categoria_id !== undefined ? body.categoria_id : row.categoria_id;
@@ -662,6 +755,200 @@ app.delete('/api/estoque/produtos/:id', authenticateToken, requireAdmin, async (
   } catch (error) {
     console.error('Erro ao remover produto:', error);
     res.status(500).json({ error: 'Erro ao remover produto' });
+  }
+});
+
+// ========== Admin: usuários de estoque + vínculos com restaurantes ==========
+
+app.get('/api/admin/usuarios-estoque', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.nome, u.created_at,
+        COALESCE(
+          array_agg(ur.restaurante_id ORDER BY ur.restaurante_id) FILTER (WHERE ur.restaurante_id IS NOT NULL),
+          ARRAY[]::integer[]
+        ) AS restaurante_ids
+       FROM usuarios u
+       LEFT JOIN usuario_restaurante_estoque ur ON ur.usuario_id = u.id
+       WHERE COALESCE(u.somente_estoque, false) = true
+       GROUP BY u.id, u.username, u.nome, u.created_at
+       ORDER BY u.nome ASC`
+    );
+    const rows = result.rows.map((row) => ({
+      id: row.id,
+      username: row.username,
+      nome: row.nome,
+      created_at: row.created_at,
+      restaurante_ids: Array.isArray(row.restaurante_ids) ? row.restaurante_ids : []
+    }));
+    res.json(rows);
+  } catch (error) {
+    console.error('Erro ao listar usuários de estoque:', error);
+    res.status(500).json({ error: 'Erro ao listar usuários de estoque' });
+  }
+});
+
+app.post('/api/admin/usuarios-estoque', authenticateToken, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { username, password, nome, restaurante_ids } = req.body || {};
+    if (!username || String(username).trim() === '') {
+      return res.status(400).json({ error: 'username é obrigatório' });
+    }
+    if (!password || String(password).length < 4) {
+      return res.status(400).json({ error: 'Senha é obrigatória (mín. 4 caracteres).' });
+    }
+    if (!nome || String(nome).trim() === '') {
+      return res.status(400).json({ error: 'nome é obrigatório' });
+    }
+    let ids = Array.isArray(restaurante_ids) ? restaurante_ids.map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x)) : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'Associe ao menos um restaurante.' });
+    }
+    const dup = await client.query('SELECT id FROM usuarios WHERE username = $1', [String(username).trim()]);
+    if (dup.rows.length > 0) {
+      return res.status(409).json({ error: 'Já existe usuário com este login.' });
+    }
+    const hash = await bcrypt.hash(String(password), 10);
+    await client.query('BEGIN');
+    const ins = await client.query(
+      `INSERT INTO usuarios (username, password, nome, is_admin, somente_estoque)
+       VALUES ($1, $2, $3, false, true)
+       RETURNING id, username, nome, created_at`,
+      [String(username).trim(), hash, String(nome).trim()]
+    );
+    const newUser = ins.rows[0];
+    let inseridos = 0;
+    for (const rid of ids) {
+      const ex = await client.query('SELECT id FROM restaurantes WHERE id = $1 AND ativo = true', [rid]);
+      if (ex.rows.length === 0) continue;
+      await client.query(
+        `INSERT INTO usuario_restaurante_estoque (usuario_id, restaurante_id) VALUES ($1, $2)
+         ON CONFLICT (usuario_id, restaurante_id) DO NOTHING`,
+        [newUser.id, rid]
+      );
+      inseridos += 1;
+    }
+    if (inseridos === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Nenhum dos restaurantes informados é válido ou está ativo.' });
+    }
+    await client.query('COMMIT');
+    const restauranteIds = await restauranteIdsUsuarioEstoque(newUser.id);
+    res.status(201).json({
+      id: newUser.id,
+      username: newUser.username,
+      nome: newUser.nome,
+      created_at: newUser.created_at,
+      restaurante_ids: restauranteIds
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Já existe usuário com este login.' });
+    }
+    console.error('Erro ao criar usuário de estoque:', error);
+    res.status(500).json({ error: 'Erro ao criar usuário de estoque' });
+  } finally {
+    client.release();
+  }
+});
+
+app.put('/api/admin/usuarios-estoque/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Não é possível alterar o próprio usuário por esta tela.' });
+    }
+    const cur = await client.query(
+      'SELECT id, username, nome FROM usuarios WHERE id = $1 AND COALESCE(somente_estoque, false) = true',
+      [userId]
+    );
+    if (cur.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário de estoque não encontrado.' });
+    }
+    const { nome, password, restaurante_ids } = req.body || {};
+    await client.query('BEGIN');
+    if (nome !== undefined) {
+      if (String(nome).trim() === '') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'nome não pode ser vazio.' });
+      }
+      await client.query('UPDATE usuarios SET nome = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
+        String(nome).trim(),
+        userId
+      ]);
+    }
+    if (password !== undefined && String(password) !== '') {
+      if (String(password).length < 4) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Senha deve ter no mínimo 4 caracteres.' });
+      }
+      const hash = await bcrypt.hash(String(password), 10);
+      await client.query('UPDATE usuarios SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [
+        hash,
+        userId
+      ]);
+    }
+    if (restaurante_ids !== undefined) {
+      const ids = Array.isArray(restaurante_ids)
+        ? restaurante_ids.map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x))
+        : [];
+      await client.query('DELETE FROM usuario_restaurante_estoque WHERE usuario_id = $1', [userId]);
+      for (const rid of ids) {
+        const ex = await client.query('SELECT id FROM restaurantes WHERE id = $1 AND ativo = true', [rid]);
+        if (ex.rows.length === 0) continue;
+        await client.query(
+          `INSERT INTO usuario_restaurante_estoque (usuario_id, restaurante_id) VALUES ($1, $2)
+           ON CONFLICT (usuario_id, restaurante_id) DO NOTHING`,
+          [userId, rid]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    const row = await pool.query(
+      'SELECT id, username, nome, created_at FROM usuarios WHERE id = $1',
+      [userId]
+    );
+    const restauranteIds = await restauranteIdsUsuarioEstoque(userId);
+    res.json({
+      ...row.rows[0],
+      restaurante_ids: restauranteIds
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao atualizar usuário de estoque:', error);
+    res.status(500).json({ error: 'Erro ao atualizar usuário de estoque' });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/admin/usuarios-estoque/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Não é possível excluir o próprio usuário.' });
+    }
+    const cur = await pool.query(
+      'SELECT id FROM usuarios WHERE id = $1 AND COALESCE(somente_estoque, false) = true',
+      [userId]
+    );
+    if (cur.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário de estoque não encontrado.' });
+    }
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [userId]);
+    res.json({ message: 'Usuário removido', id: userId });
+  } catch (error) {
+    console.error('Erro ao remover usuário de estoque:', error);
+    res.status(500).json({ error: 'Erro ao remover usuário de estoque' });
   }
 });
 

@@ -6,17 +6,26 @@
 - **Admin** (`usuarios.is_admin = true`): cadastra categorias e produtos (nome, unidade, categoria, quantidade inicial), edita tudo e exclui.
 - **Demais usuários**: só alteram **quantidade** (API valida).
 - **Perfil estoque** (`usuarios.somente_estoque = true`): vê **apenas** o módulo Estoque no app; rotas `/api/gastos*` retornam **403**; **POST/PUT/DELETE** em `/api/restaurantes` também retornam **403** (apenas **GET** para escolher o restaurante no seletor).
+- **Restaurantes por usuário de estoque**: a tabela `usuario_restaurante_estoque` define em quais restaurantes cada usuário `somente_estoque` pode **ver e lançar** estoque. Fora dessa lista, **GET** `/api/restaurantes`, **GET** `/api/estoque/agrupado` e **PUT** de quantidade em produto retornam **403**.
+- **Administrador**: no app, aba **Usuários estoque** — criar/editar/excluir usuários `somente_estoque` e marcar os restaurantes de cada um.
 
 ## Migração SQL
 
-Execute no PostgreSQL (ou rode `node backend/database/migrate.js` após incluir `006_estoque_modulo.sql` na lista):
+Execute no PostgreSQL (ou rode `node backend/database/migrate.js` após incluir as migrações na lista):
 
-Arquivo: `backend/database/migrations/006_estoque_modulo.sql`
+Arquivos:
 
-Conteúdo principal:
+- `006_estoque_modulo.sql` — coluna `somente_estoque`, tabelas de estoque.
+- `007_usuario_restaurante_estoque.sql` — vínculo usuário ↔ restaurante para perfil estoque (e backfill: quem já era `somente_estoque` ganha acesso a todos os restaurantes ativos).
+
+Conteúdo principal (006):
 
 - `ALTER TABLE usuarios ADD COLUMN somente_estoque BOOLEAN DEFAULT false`
 - Tabelas `estoque_categorias` e `estoque_produtos`
+
+Conteúdo principal (007):
+
+- Tabela `usuario_restaurante_estoque (usuario_id, restaurante_id)`
 
 ## Marcar usuário como “somente estoque”
 
@@ -48,6 +57,17 @@ WHERE username = 'admin';
 | POST | `/api/estoque/produtos` | Admin |
 | PUT | `/api/estoque/produtos/:id` | Admin: corpo completo; demais: só `{ "quantidade": n }` |
 | DELETE | `/api/estoque/produtos/:id` | Admin |
+
+### Admin — usuários de estoque (somente `is_admin`)
+
+| Método | Rota | Corpo / notas |
+|--------|------|----------------|
+| GET | `/api/admin/usuarios-estoque` | Lista usuários com `somente_estoque` e `restaurante_ids` |
+| POST | `/api/admin/usuarios-estoque` | `username`, `password`, `nome`, `restaurante_ids` (array, ≥1) |
+| PUT | `/api/admin/usuarios-estoque/:id` | `nome`, `password` (opcional), `restaurante_ids` (substitui vínculos) |
+| DELETE | `/api/admin/usuarios-estoque/:id` | Remove o usuário |
+
+Login e `/api/verify` passam a incluir `restaurante_ids` no objeto `user` quando `somente_estoque` é true.
 
 ## Frontend (TypeScript incremental)
 
