@@ -200,6 +200,107 @@
   gap: 0.65rem;
 }
 
+/* Modo operador (usuário estoque): card com categoria, nome, unidade, quantidade */
+.estoque-operador-ajuda {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #475569;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.estoque-produto--card {
+  background: #fff;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px;
+  margin: 0.5rem 0.5rem 0.65rem;
+  padding: 1rem !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.estoque-item-detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.estoque-item-linha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.estoque-item-linha--qtd {
+  margin-top: 0.25rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.estoque-item-rotulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.estoque-item-valor {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.estoque-item-valor--nome {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.estoque-item-valor--un {
+  display: inline-block;
+  background: #f1f5f9;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  width: fit-content;
+}
+
+.estoque-qtd-label-visivel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.estoque-qtd-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.estoque-qtd-row--inline .estoque-qtd-controls {
+  flex: 1;
+}
+
+.estoque-qtd-row--inline .estoque-input-qtd {
+  flex: 1 1 120px;
+  min-width: 100px;
+  max-width: none;
+}
+
+.estoque-produto-excluir {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
 .estoque-produto-info {
   display: flex;
   justify-content: space-between;
