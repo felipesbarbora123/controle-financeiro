@@ -5,7 +5,8 @@ import GridEditavel from './components/GridEditavel';
 import Login from './components/Login';
 import CadastroRestaurantes from './components/CadastroRestaurantes';
 import Relatorios from './components/Relatorios';
-import Estoque from './components/Estoque';
+import EstoqueShell from './components/estoque/EstoqueShell';
+import AdminDashboard from './components/AdminDashboard';
 import { API_URL } from './config';
 
 // Configurar axios para incluir token em todas as requisições
@@ -47,11 +48,14 @@ function App() {
   const [telaAtual, setTelaAtual] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
-      return u.somente_estoque ? 'estoque' : 'gastos';
+      if (u.somente_estoque) return 'estoque';
+      if (u.is_admin) return 'inicio';
+      return 'gastos';
     } catch {
       return 'gastos';
     }
-  }); // 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
+  }); // 'inicio' | 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
+  const [estoqueView, setEstoqueView] = useState('visao'); // 'visao' | 'categorias' | 'produtos'
   const [msgEstoque, setMsgEstoque] = useState(null);
 
   useEffect(() => {
@@ -68,8 +72,15 @@ function App() {
   useEffect(() => {
     if (user?.somente_estoque) {
       setTelaAtual('estoque');
+      setEstoqueView('visao');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (telaAtual === 'inicio' && user && !user.is_admin && !user.somente_estoque) {
+      setTelaAtual('gastos');
+    }
+  }, [telaAtual, user]);
 
   // Perfil somente estoque não carrega gastos — liberar tela de loading
   useEffect(() => {
@@ -114,6 +125,14 @@ function App() {
   const handleLogin = (userData, token) => {
     setUser(userData);
     setIsAuthenticated(true);
+    if (userData.somente_estoque) {
+      setTelaAtual('estoque');
+      setEstoqueView('visao');
+    } else if (userData.is_admin) {
+      setTelaAtual('inicio');
+    } else {
+      setTelaAtual('gastos');
+    }
   };
 
   const handleLogout = () => {
@@ -273,6 +292,7 @@ function App() {
   }
 
   const somenteEstoque = !!user?.somente_estoque;
+  const isAdmin = !!user?.is_admin;
 
   if (loading && !somenteEstoque) {
     return (
@@ -291,6 +311,14 @@ function App() {
     await carregarRestaurantes();
   };
 
+  const restauranteAtual = restaurantes.find((r) => r.id === restauranteSelecionado);
+
+  const irParaEstoque = (view = 'visao') => {
+    setEstoqueView(view);
+    setTelaAtual('estoque');
+    setMsgEstoque(null);
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -301,7 +329,16 @@ function App() {
           )}
         </div>
         <div className="header-actions">
-          <div className="nav-tabs">
+          <div className="nav-tabs nav-tabs--scroll">
+            {!somenteEstoque && isAdmin && (
+              <button
+                type="button"
+                onClick={() => setTelaAtual('inicio')}
+                className={telaAtual === 'inicio' ? 'nav-tab active' : 'nav-tab'}
+              >
+                Início
+              </button>
+            )}
             {!somenteEstoque && (
               <>
                 <button
@@ -329,13 +366,18 @@ function App() {
             )}
             <button
               type="button"
-              onClick={() => setTelaAtual('estoque')}
+              onClick={() => irParaEstoque('visao')}
               className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
             >
               Estoque
             </button>
           </div>
-          {(telaAtual === 'gastos' || telaAtual === 'estoque' || somenteEstoque) && restaurantes.length > 0 && (
+          {(telaAtual === 'gastos' ||
+            telaAtual === 'estoque' ||
+            telaAtual === 'inicio' ||
+            telaAtual === 'relatorios' ||
+            somenteEstoque) &&
+            restaurantes.length > 0 && (
             <select
               value={restauranteSelecionado || ''}
               onChange={handleRestauranteChange}
@@ -371,15 +413,27 @@ function App() {
       )}
 
       <main className="app-main">
-        {telaAtual === 'estoque' ? (
+        {telaAtual === 'inicio' && isAdmin && !somenteEstoque ? (
+          <AdminDashboard
+            restauranteId={restauranteSelecionado}
+            restauranteNome={restauranteAtual?.nome}
+            gastos={gastos}
+            onIrParaGastos={() => setTelaAtual('gastos')}
+            onIrParaRelatorios={() => setTelaAtual('relatorios')}
+            onIrParaEstoque={(view) => irParaEstoque(view || 'visao')}
+            onIrParaRestaurantes={() => setTelaAtual('restaurantes')}
+          />
+        ) : telaAtual === 'estoque' ? (
           restaurantes.length === 0 ? (
             <div className="empty-state">
               <p>Nenhum restaurante disponível. Peça ao administrador para cadastrar um restaurante.</p>
             </div>
           ) : (
-            <Estoque
+            <EstoqueShell
               restauranteId={restauranteSelecionado}
               isAdmin={!!user?.is_admin}
+              view={estoqueView}
+              onViewChange={setEstoqueView}
               onMessage={setMsgEstoque}
             />
           )
