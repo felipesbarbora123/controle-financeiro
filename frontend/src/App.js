@@ -317,6 +317,13 @@ function App() {
     setEstoqueView(view);
     setTelaAtual('estoque');
     setMsgEstoque(null);
+    // Após o painel montar, leva o usuário até o lançamento (feedback ao tocar na aba)
+    setTimeout(() => {
+      document.getElementById('estoque-lancamento-panel')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 0);
   };
 
   return (
@@ -369,7 +376,7 @@ function App() {
               onClick={() => irParaEstoque('visao')}
               className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
             >
-              Estoque
+              {somenteEstoque ? 'Lançar estoque' : 'Estoque'}
             </button>
           </div>
           {(telaAtual === 'gastos' ||

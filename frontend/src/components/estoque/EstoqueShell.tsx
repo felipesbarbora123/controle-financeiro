@@ -60,6 +60,9 @@ const EstoqueShell: React.FC<Props> = ({
     return <div className="estoque-empty">Selecione um restaurante.</div>;
   }
 
+  /** Operador nunca vê categorias/produtos: evita tela em branco se view veio errada do estado */
+  const effectiveView: EstoqueView = isAdmin ? view : 'visao';
+
   const subNavItems: { id: EstoqueView; label: string; adminOnly?: boolean }[] = [
     { id: 'visao', label: isAdmin ? 'Visão geral' : 'Lançar estoque' },
     { id: 'categorias', label: 'Categorias', adminOnly: true },
@@ -67,26 +70,30 @@ const EstoqueShell: React.FC<Props> = ({
   ];
 
   const visibleNav = subNavItems.filter((item) => !item.adminOnly || isAdmin);
+  /** Um único “tab” que não muda de tela confunde; operador vê só o painel de lançamento */
+  const mostrarSubnav = isAdmin;
 
   return (
     <div className="estoque-shell">
-      <nav className="estoque-subnav" aria-label="Menu do estoque">
-        <div className="estoque-subnav-scroll">
-          {visibleNav.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`estoque-subnav-btn ${view === item.id ? 'estoque-subnav-btn--active' : ''}`}
-              onClick={() => onViewChange(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      {mostrarSubnav && (
+        <nav className="estoque-subnav" aria-label="Menu do estoque">
+          <div className="estoque-subnav-scroll">
+            {visibleNav.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`estoque-subnav-btn ${view === item.id ? 'estoque-subnav-btn--active' : ''}`}
+                onClick={() => onViewChange(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
-      <div className="estoque-shell-content">
-        {view === 'visao' && (
+      <div className="estoque-shell-content" id="estoque-lancamento-panel">
+        {effectiveView === 'visao' && (
           <EstoqueVisaoGeral
             categorias={categorias}
             loading={loading}
@@ -96,7 +103,7 @@ const EstoqueShell: React.FC<Props> = ({
             modoOperador={!isAdmin}
           />
         )}
-        {view === 'categorias' && isAdmin && (
+        {effectiveView === 'categorias' && isAdmin && (
           <EstoqueCategorias
             restauranteId={restauranteId}
             categorias={categorias}
@@ -105,7 +112,7 @@ const EstoqueShell: React.FC<Props> = ({
             onMessage={onMessage}
           />
         )}
-        {view === 'produtos' && isAdmin && (
+        {effectiveView === 'produtos' && isAdmin && (
           <EstoqueProdutos
             restauranteId={restauranteId}
             categorias={categorias}
