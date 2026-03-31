@@ -301,6 +301,105 @@
   margin-top: 0.5rem;
 }
 
+/* Lista plana (sem categorias recolhíveis) — operador e admin */
+.estoque-lista--plana {
+  padding-top: 0.25rem;
+}
+
+.estoque-lista-plana {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.estoque-produto--simple {
+  padding: 0.85rem 1rem !important;
+  margin: 0 !important;
+}
+
+.estoque-item-valor--desc {
+  font-weight: 500;
+  color: #334155;
+  text-transform: none;
+  font-size: 0.95rem;
+}
+
+.estoque-admin-visao-hint {
+  font-size: 0.88rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.estoque-produto--admin-linha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.estoque-produto--admin-linha:last-child {
+  border-bottom: none;
+}
+
+.estoque-produto-info--simples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+}
+
+.estoque-produto-desc-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.estoque-produto-info--simples .estoque-produto-un {
+  text-transform: none;
+  font-size: 0.9rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.estoque-produto-acoes-qtd {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+@media (min-width: 560px) {
+  .estoque-produto--admin-linha {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .estoque-produto-acoes-qtd {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .estoque-produto-acoes-qtd .estoque-produto-excluir {
+    margin-top: 0;
+    align-self: center;
+  }
+}
+
 .estoque-produto-info {
   display: flex;
   justify-content: space-between;

@@ -23,7 +23,7 @@ const EstoqueProdutos: React.FC<Props> = ({
   const [novoProduto, setNovoProduto] = useState({
     categoria_id: '' as string | number,
     nome: '',
-    unidade: 'un',
+    unidade: '',
     quantidade: '0'
   });
 
@@ -36,10 +36,10 @@ const EstoqueProdutos: React.FC<Props> = ({
         restaurante_id: restauranteId,
         categoria_id: Number(novoProduto.categoria_id),
         nome: novoProduto.nome.trim(),
-        unidade: novoProduto.unidade || 'un',
+        unidade: (novoProduto.unidade && String(novoProduto.unidade).trim()) || 'un',
         quantidade: parseFloat(String(novoProduto.quantidade).replace(',', '.')) || 0
       });
-      setNovoProduto({ categoria_id: '', nome: '', unidade: 'un', quantidade: '0' });
+      setNovoProduto({ categoria_id: '', nome: '', unidade: '', quantidade: '0' });
       await onReload();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -94,18 +94,19 @@ const EstoqueProdutos: React.FC<Props> = ({
           />
           <div className="estoque-form-row estoque-form-row--wrap">
             <div className="estoque-field-grow">
-              <label className="estoque-label">Unidade</label>
-              <select
+              <label className="estoque-label">Descrição (como contar / embalagem)</label>
+              <input
                 className="estoque-input"
+                list="estoque-unidades-sugestao"
                 value={novoProduto.unidade}
                 onChange={(e) => setNovoProduto((p) => ({ ...p, unidade: e.target.value }))}
-              >
+                placeholder="Ex.: kg, caixa, fardo, litro"
+              />
+              <datalist id="estoque-unidades-sugestao">
                 {UNIDADES_SUGERIDAS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
+                  <option key={u} value={u} />
                 ))}
-              </select>
+              </datalist>
             </div>
             <div className="estoque-field-grow">
               <label className="estoque-label">Qtd. inicial</label>
@@ -142,7 +143,8 @@ const EstoqueProdutos: React.FC<Props> = ({
                         <div>
                           <span className="estoque-produto-flat-nome">{p.nome}</span>
                           <span className="estoque-produto-flat-meta">
-                            {p.quantidade} {p.unidade}
+                            Qtd. {p.quantidade}
+                            {p.unidade ? ` · ${p.unidade}` : ''}
                           </span>
                         </div>
                         <button

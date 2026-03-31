@@ -177,8 +177,9 @@ const AdminUsuariosEstoque: React.FC<Props> = ({ onError }) => {
       <header className="admin-ue-header">
         <h1 className="admin-ue-title">Usuários de estoque</h1>
         <p className="admin-ue-hint">
-          Crie logins que veem apenas o módulo de estoque. Cada usuário só lança quantidades nos restaurantes marcados
-          abaixo.
+          Crie logins que veem apenas o módulo de estoque. O operador <strong>só acessa as lojas que você marcar</strong>{' '}
+          — normalmente uma loja por usuário. Só marque várias se essa pessoa tiver permissão para lançar em mais de um
+          local.
         </p>
         <button type="button" className="admin-ue-refresh" onClick={() => carregar()}>
           Atualizar lista
@@ -220,7 +221,7 @@ const AdminUsuariosEstoque: React.FC<Props> = ({ onError }) => {
             />
           </label>
           <fieldset className="admin-ue-fieldset">
-            <legend className="admin-ue-legend">Restaurantes com acesso ao estoque</legend>
+            <legend className="admin-ue-legend">Lojas / restaurantes liberados para este usuário</legend>
             {restaurantes.length === 0 ? (
               <p className="admin-ue-empty">Cadastre restaurantes antes.</p>
             ) : (
@@ -274,7 +275,7 @@ const AdminUsuariosEstoque: React.FC<Props> = ({ onError }) => {
                       />
                     </label>
                     <fieldset className="admin-ue-fieldset">
-                      <legend className="admin-ue-legend">Restaurantes</legend>
+                      <legend className="admin-ue-legend">Lojas liberadas</legend>
                       <ul className="admin-ue-checklist">
                         {restaurantes.map((r) => (
                           <li key={r.id}>
@@ -310,7 +311,7 @@ const AdminUsuariosEstoque: React.FC<Props> = ({ onError }) => {
                       <span className="admin-ue-user-name">{u.nome}</span>
                       <span className="admin-ue-user-login">@{u.username}</span>
                       <span className="admin-ue-user-rests">
-                        Restaurantes:{' '}
+                        Lojas:{' '}
                         {(u.restaurante_ids || [])
                           .map((id) => restaurantes.find((r) => r.id === id)?.nome || `#${id}`)
                           .join(', ') || 'nenhum'}

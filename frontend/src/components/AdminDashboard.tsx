@@ -170,7 +170,7 @@ const AdminDashboard: React.FC<Props> = ({
           )}
           <div className="admin-dashboard-actions admin-dashboard-actions--stack">
             <button type="button" className="admin-dashboard-btn" onClick={() => onIrParaEstoque('visao')}>
-              Visão geral do estoque
+              Itens do estoque
             </button>
             <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('categorias')}>
               Cadastro de categorias
@@ -192,7 +192,7 @@ const AdminDashboard: React.FC<Props> = ({
             Lançar gastos
           </button>
           <button type="button" className="admin-dashboard-chip" onClick={() => onIrParaEstoque('visao')}>
-            Conferir estoque
+            Ver itens
           </button>
           {onIrParaUsuariosEstoque && (
             <button type="button" className="admin-dashboard-chip" onClick={onIrParaUsuariosEstoque}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
@@ -9,9 +9,18 @@ interface Props {
   loading: boolean;
   onReload: () => Promise<void>;
   isAdmin: boolean;
-  /** Usuário só estoque / não-admin: destaca lançamento de quantidade com todos os campos visíveis */
   modoOperador?: boolean;
   onMessage?: (msg: string | null) => void;
+}
+
+/** Lista plana para não exibir categorias recolhíveis na tela de lançamento / resumo */
+function flattenProdutos(categorias: EstoqueCategoria[]): EstoqueProduto[] {
+  const list: EstoqueProduto[] = [];
+  categorias.forEach((cat) => {
+    (cat.produtos || []).forEach((p) => list.push(p));
+  });
+  list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+  return list;
 }
 
 const EstoqueVisaoGeral: React.FC<Props> = ({
@@ -22,21 +31,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   modoOperador = false,
   onMessage
 }) => {
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-
-  useEffect(() => {
-    setExpanded((prev) => {
-      const next = { ...prev };
-      categorias.forEach((c) => {
-        if (next[c.id] === undefined) next[c.id] = true;
-      });
-      return next;
-    });
-  }, [categorias]);
-
-  const toggleCat = (id: number) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const produtosPlano = useMemo(() => flattenProdutos(categorias), [categorias]);
 
   const salvarQuantidade = async (produto: EstoqueProduto, valorTexto: string) => {
     const q = parseFloat(String(valorTexto).replace(',', '.'));
@@ -65,22 +60,13 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
     }
   };
 
-  const excluirCategoria = async (id: number) => {
-    if (!window.confirm('Excluir categoria e todos os itens dentro dela?')) return;
-    onMessage?.(null);
-    try {
-      await axios.delete(`${API_URL}/estoque/categorias/${id}`);
-      await onReload();
-    } catch {
-      onMessage?.('Erro ao excluir categoria.');
-    }
-  };
-
   if (loading) {
     return <div className="estoque-loading">Carregando estoque…</div>;
   }
 
-  const tituloTela = modoOperador ? 'Lançar estoque' : 'Visão geral';
+  const tituloTela = modoOperador ? 'Lançar estoque' : 'Itens';
+
+  const vazio = categorias.length === 0 || produtosPlano.length === 0;
 
   return (
     <div className="estoque-modulo estoque-modulo--screen">
@@ -93,88 +79,72 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {modoOperador && (
         <p className="estoque-operador-ajuda">
-          Cada item mostra <strong>categoria</strong>, <strong>nome</strong>, <strong>unidade</strong> (kg, cx, fd…) e a{' '}
-          <strong>quantidade</strong> que você pode alterar conforme a contagem. Toque em <strong>Salvar</strong> para gravar.
+          Para cada item, informe a <strong>quantidade</strong> contada. O campo <strong>descrição</strong> só lembra como o
+          produto é contado (ex.: caixa, kg). O restaurante deste lançamento é o selecionado no topo — você só enxerga as{' '}
+          <strong>lojas</strong> às quais o administrador liberou seu usuário.
         </p>
       )}
 
-      <section className="estoque-lista" aria-label="Itens por categoria">
-        {categorias.length === 0 && (
+      {!modoOperador && isAdmin && (
+        <p className="estoque-admin-visao-hint">
+          Lista simples dos itens do restaurante selecionado. Para criar categorias ou cadastrar produtos, use as abas
+          acima.
+        </p>
+      )}
+
+      <section className="estoque-lista estoque-lista--plana" aria-label="Itens de estoque">
+        {vazio ? (
           <p className="estoque-empty-msg">
-            Nenhuma categoria cadastrada.
-            {isAdmin ? ' Use o menu Cadastro de categorias.' : ' Peça ao admin para cadastrar itens.'}
+            {categorias.length === 0
+              ? `Nenhuma categoria cadastrada.${isAdmin ? ' Use a aba Categorias.' : ' Peça ao admin para cadastrar itens.'}`
+              : 'Nenhum produto neste restaurante.'}
           </p>
+        ) : modoOperador ? (
+          <ul className="estoque-lista-plana">
+            {produtosPlano.map((p) => (
+              <li key={p.id} className="estoque-produto estoque-produto--card estoque-produto--simple">
+                <div className="estoque-item-detalhe">
+                  <div className="estoque-item-linha">
+                    <span className="estoque-item-rotulo">Item</span>
+                    <span className="estoque-item-valor estoque-item-valor--nome">{p.nome}</span>
+                  </div>
+                  <div className="estoque-item-linha">
+                    <span className="estoque-item-rotulo">Descrição</span>
+                    <span className="estoque-item-valor estoque-item-valor--desc">{p.unidade || '—'}</span>
+                  </div>
+                  <div className="estoque-item-linha estoque-item-linha--qtd">
+                    <span className="estoque-item-rotulo">Quantidade</span>
+                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} mostrarRotulo={false} />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="estoque-lista-plana estoque-lista-plana--admin">
+            {produtosPlano.map((p) => (
+              <li key={p.id} className="estoque-produto estoque-produto--admin-linha">
+                <div className="estoque-produto-info estoque-produto-info--simples">
+                  <span className="estoque-produto-nome">{p.nome}</span>
+                  <span className="estoque-produto-desc-label">Descrição:</span>
+                  <span className="estoque-produto-un">{p.unidade || '—'}</span>
+                </div>
+                <div className="estoque-produto-acoes-qtd">
+                  <QuantidadeEditor produto={p} onSave={salvarQuantidade} />
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="estoque-btn-danger estoque-btn-small estoque-produto-excluir"
+                      onClick={() => excluirProduto(p.id)}
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-        {categorias.map((cat) => (
-          <div key={cat.id} className="estoque-categoria">
-            <button
-              type="button"
-              className="estoque-categoria-header"
-              onClick={() => toggleCat(cat.id)}
-              aria-expanded={expanded[cat.id]}
-            >
-              <span className="estoque-categoria-nome">{cat.nome}</span>
-              <span className="estoque-categoria-badge">{cat.produtos?.length || 0}</span>
-              <span className="estoque-chevron">{expanded[cat.id] ? '▼' : '▶'}</span>
-            </button>
-            {expanded[cat.id] && (
-              <ul className="estoque-produtos">
-                {(cat.produtos || []).map((p) => (
-                  <li key={p.id} className={`estoque-produto ${modoOperador ? 'estoque-produto--card' : ''}`}>
-                    {modoOperador ? (
-                      <div className="estoque-item-detalhe">
-                        <div className="estoque-item-linha">
-                          <span className="estoque-item-rotulo">Categoria</span>
-                          <span className="estoque-item-valor">{cat.nome}</span>
-                        </div>
-                        <div className="estoque-item-linha">
-                          <span className="estoque-item-rotulo">Nome do item</span>
-                          <span className="estoque-item-valor estoque-item-valor--nome">{p.nome}</span>
-                        </div>
-                        <div className="estoque-item-linha">
-                          <span className="estoque-item-rotulo">Unidade</span>
-                          <span className="estoque-item-valor estoque-item-valor--un">{p.unidade}</span>
-                        </div>
-                        <div className="estoque-item-linha estoque-item-linha--qtd">
-                          <span className="estoque-item-rotulo">Quantidade</span>
-                          <QuantidadeEditor produto={p} onSave={salvarQuantidade} mostrarRotulo={false} />
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="estoque-produto-info">
-                          <span className="estoque-produto-nome">{p.nome}</span>
-                          <span className="estoque-produto-un">{p.unidade}</span>
-                        </div>
-                        <QuantidadeEditor produto={p} onSave={salvarQuantidade} />
-                      </>
-                    )}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        className="estoque-btn-danger estoque-btn-small estoque-produto-excluir"
-                        onClick={() => excluirProduto(p.id)}
-                      >
-                        Excluir
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {isAdmin && expanded[cat.id] && (
-              <div className="estoque-cat-actions">
-                <button
-                  type="button"
-                  className="estoque-btn-danger estoque-btn-small"
-                  onClick={() => excluirCategoria(cat.id)}
-                >
-                  Excluir categoria
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
       </section>
     </div>
   );
@@ -183,7 +153,6 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 interface QEProps {
   produto: EstoqueProduto;
   onSave: (p: EstoqueProduto, v: string) => void;
-  /** false quando o rótulo "Quantidade" já está fora do componente (modo card) */
   mostrarRotulo?: boolean;
 }
 
@@ -213,10 +182,10 @@ const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, mostrarRotulo = 
               onSave(produto, val);
             }
           }}
-          aria-label={`Quantidade em ${produto.unidade}`}
+          aria-label={`Quantidade de ${produto.nome}`}
         />
         <button type="button" className="estoque-btn-primary estoque-btn-small" onClick={() => onSave(produto, val)}>
-          Salvar quantidade
+          Salvar
         </button>
       </div>
     </div>

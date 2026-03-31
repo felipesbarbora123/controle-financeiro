@@ -64,7 +64,7 @@ const EstoqueShell: React.FC<Props> = ({
   const effectiveView: EstoqueView = isAdmin ? view : 'visao';
 
   const subNavItems: { id: EstoqueView; label: string; adminOnly?: boolean }[] = [
-    { id: 'visao', label: isAdmin ? 'Visão geral' : 'Lançar estoque' },
+    { id: 'visao', label: isAdmin ? 'Itens' : 'Lançar estoque' },
     { id: 'categorias', label: 'Categorias', adminOnly: true },
     { id: 'produtos', label: 'Produtos', adminOnly: true }
   ];
