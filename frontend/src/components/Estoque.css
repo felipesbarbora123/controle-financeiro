@@ -338,30 +338,6 @@
   border: 1px solid #e2e8f0;
 }
 
-.estoque-item-detalhe--operador {
-  gap: 0.5rem;
-}
-
-/* Operador: descrição + qtd + salvar na mesma linha (quebra em telas estreitas) */
-.estoque-operador-linha-qtd {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.65rem;
-  padding-top: 0.35rem;
-  margin-top: 0.25rem;
-  border-top: 1px dashed #e2e8f0;
-}
-
-.estoque-operador-desc {
-  flex: 1 1 120px;
-  min-width: 0;
-  font-size: 0.92rem;
-  color: #334155;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
 /* Editor de quantidade: label + input + ícone */
 .estoque-qtd-editor {
   display: flex;
@@ -371,10 +347,6 @@
   flex: 0 1 auto;
 }
 
-.estoque-qtd-editor--operador {
-  margin-left: auto;
-}
-
 .estoque-qtd-editor-label {
   font-size: 0.72rem;
   font-weight: 700;
@@ -382,10 +354,6 @@
   letter-spacing: 0.03em;
   color: #64748b;
   white-space: nowrap;
-}
-
-.estoque-qtd-editor-label--operador {
-  flex: 0 0 auto;
 }
 
 .estoque-input-qtd--int {
@@ -433,15 +401,7 @@
   background: #fee2e2;
 }
 
-@media (max-width: 360px) {
-  .estoque-qtd-editor--operador {
-    margin-left: 0;
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
-/* Admin: uma linha com meta + controles (quebra responsiva) */
+/* Lista itens (admin e operador): meta + controles na mesma linha (quebra responsiva) */
 .estoque-produto--admin-linha {
   padding: 0.75rem 0;
   border-bottom: 1px solid #e2e8f0;

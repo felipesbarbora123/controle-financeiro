@@ -105,29 +105,6 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
               ? `Nenhuma categoria cadastrada.${isAdmin ? ' Use a aba Categorias.' : ' Peça ao admin para cadastrar itens.'}`
               : 'Nenhum produto neste restaurante.'}
           </p>
-        ) : modoOperador ? (
-          <ul className="estoque-lista-plana">
-            {produtosPlano.map((p) => (
-              <li key={p.id} className="estoque-produto estoque-produto--card estoque-produto--simple">
-                <div className="estoque-item-detalhe estoque-item-detalhe--operador">
-                  <div className="estoque-item-linha">
-                    <span className="estoque-item-rotulo">Item</span>
-                    <span className="estoque-item-valor estoque-item-valor--nome">{p.nome}</span>
-                  </div>
-                  <div className="estoque-operador-linha-qtd">
-                    <span className="estoque-operador-desc" title="Descrição">
-                      {p.unidade || '—'}
-                    </span>
-                    <QuantidadeEditor
-                      produto={p}
-                      onSave={salvarQuantidade}
-                      layout="operador"
-                    />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
         ) : (
           <ul className="estoque-lista-plana estoque-lista-plana--admin">
             {produtosPlano.map((p) => (
@@ -141,7 +118,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
                     </span>
                   </div>
                   <div className="estoque-admin-linha-acoes">
-                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} layout="admin" />
+                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} />
                     {isAdmin && (
                       <button
                         type="button"
@@ -167,10 +144,9 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 interface QEProps {
   produto: EstoqueProduto;
   onSave: (p: EstoqueProduto, v: string) => void;
-  layout: 'operador' | 'admin';
 }
 
-const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, layout }) => {
+const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave }) => {
   const synced = qtdeInt(produto.quantidade);
   const [val, setVal] = useState(synced);
 
@@ -187,20 +163,11 @@ const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, layout }) => {
     onSave(produto, val);
   }, [onSave, produto, val]);
 
-  const isOperador = layout === 'operador';
-
   return (
-    <div className={`estoque-qtd-editor estoque-qtd-editor--${layout}`}>
-      {!isOperador && (
-        <label className="estoque-qtd-editor-label" htmlFor={`qtd-${produto.id}`}>
-          Qtd.
-        </label>
-      )}
-      {isOperador && (
-        <span className="estoque-qtd-editor-label estoque-qtd-editor-label--operador" id={`qtd-lbl-${produto.id}`}>
-          Qtd.
-        </span>
-      )}
+    <div className="estoque-qtd-editor estoque-qtd-editor--admin">
+      <label className="estoque-qtd-editor-label" htmlFor={`qtd-${produto.id}`}>
+        Qtd.
+      </label>
       <input
         id={`qtd-${produto.id}`}
         className="estoque-input estoque-input-qtd estoque-input-qtd--int"
@@ -209,8 +176,7 @@ const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, layout }) => {
         autoComplete="off"
         value={val}
         onChange={onInputChange}
-        aria-labelledby={isOperador ? `qtd-lbl-${produto.id}` : undefined}
-        aria-label={isOperador ? `Quantidade inteira de ${produto.nome}` : undefined}
+        aria-label={`Quantidade inteira de ${produto.nome}`}
       />
       <button
         type="button"
