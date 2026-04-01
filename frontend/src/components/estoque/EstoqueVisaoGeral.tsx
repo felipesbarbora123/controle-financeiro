@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
+import { IconSave, IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
 
 interface Props {
@@ -13,7 +14,6 @@ interface Props {
   onMessage?: (msg: string | null) => void;
 }
 
-/** Lista plana para não exibir categorias recolhíveis na tela de lançamento / resumo */
 function flattenProdutos(categorias: EstoqueCategoria[]): EstoqueProduto[] {
   const list: EstoqueProduto[] = [];
   categorias.forEach((cat) => {
@@ -21,6 +21,12 @@ function flattenProdutos(categorias: EstoqueCategoria[]): EstoqueProduto[] {
   });
   list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
   return list;
+}
+
+/** Exibe quantidade como inteiro */
+function qtdeInt(q: string | number | null | undefined): string {
+  const n = Math.max(0, Math.round(Number(q)) || 0);
+  return String(n);
 }
 
 const EstoqueVisaoGeral: React.FC<Props> = ({
@@ -34,11 +40,12 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   const produtosPlano = useMemo(() => flattenProdutos(categorias), [categorias]);
 
   const salvarQuantidade = async (produto: EstoqueProduto, valorTexto: string) => {
-    const q = parseFloat(String(valorTexto).replace(',', '.'));
-    if (Number.isNaN(q)) {
-      onMessage?.('Quantidade inválida.');
+    const s = String(valorTexto).trim();
+    if (s === '' || !/^\d+$/.test(s)) {
+      onMessage?.('Informe uma quantidade inteira (sem decimais).');
       return;
     }
+    const q = parseInt(s, 10);
     onMessage?.(null);
     try {
       await axios.put(`${API_URL}/estoque/produtos/${produto.id}`, { quantidade: q });
@@ -79,16 +86,15 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {modoOperador && (
         <p className="estoque-operador-ajuda">
-          Para cada item, informe a <strong>quantidade</strong> contada. O campo <strong>descrição</strong> só lembra como o
-          produto é contado (ex.: caixa, kg). O restaurante deste lançamento é o selecionado no topo — você só enxerga as{' '}
-          <strong>lojas</strong> às quais o administrador liberou seu usuário.
+          A <strong>quantidade</strong> é sempre um número inteiro (sem vírgula ou ponto). A <strong>descrição</strong>{' '}
+          lembra como o produto é contado. O restaurante é o selecionado no topo — você só vê as <strong>lojas</strong>{' '}
+          liberadas pelo administrador.
         </p>
       )}
 
       {!modoOperador && isAdmin && (
         <p className="estoque-admin-visao-hint">
-          Lista simples dos itens do restaurante selecionado. Para criar categorias ou cadastrar produtos, use as abas
-          acima.
+          Quantidades inteiras. Para categorias e cadastro de produtos, use as abas acima.
         </p>
       )}
 
@@ -103,18 +109,20 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
           <ul className="estoque-lista-plana">
             {produtosPlano.map((p) => (
               <li key={p.id} className="estoque-produto estoque-produto--card estoque-produto--simple">
-                <div className="estoque-item-detalhe">
+                <div className="estoque-item-detalhe estoque-item-detalhe--operador">
                   <div className="estoque-item-linha">
                     <span className="estoque-item-rotulo">Item</span>
                     <span className="estoque-item-valor estoque-item-valor--nome">{p.nome}</span>
                   </div>
-                  <div className="estoque-item-linha">
-                    <span className="estoque-item-rotulo">Descrição</span>
-                    <span className="estoque-item-valor estoque-item-valor--desc">{p.unidade || '—'}</span>
-                  </div>
-                  <div className="estoque-item-linha estoque-item-linha--qtd">
-                    <span className="estoque-item-rotulo">Quantidade</span>
-                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} mostrarRotulo={false} />
+                  <div className="estoque-operador-linha-qtd">
+                    <span className="estoque-operador-desc" title="Descrição">
+                      {p.unidade || '—'}
+                    </span>
+                    <QuantidadeEditor
+                      produto={p}
+                      onSave={salvarQuantidade}
+                      layout="operador"
+                    />
                   </div>
                 </div>
               </li>
@@ -124,22 +132,28 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
           <ul className="estoque-lista-plana estoque-lista-plana--admin">
             {produtosPlano.map((p) => (
               <li key={p.id} className="estoque-produto estoque-produto--admin-linha">
-                <div className="estoque-produto-info estoque-produto-info--simples">
-                  <span className="estoque-produto-nome">{p.nome}</span>
-                  <span className="estoque-produto-desc-label">Descrição:</span>
-                  <span className="estoque-produto-un">{p.unidade || '—'}</span>
-                </div>
-                <div className="estoque-produto-acoes-qtd">
-                  <QuantidadeEditor produto={p} onSave={salvarQuantidade} />
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      className="estoque-btn-danger estoque-btn-small estoque-produto-excluir"
-                      onClick={() => excluirProduto(p.id)}
-                    >
-                      Excluir
-                    </button>
-                  )}
+                <div className="estoque-admin-linha-conteudo">
+                  <div className="estoque-produto-info estoque-produto-info--simples">
+                    <span className="estoque-produto-nome">{p.nome}</span>
+                    <span className="estoque-produto-desc-inline">
+                      <span className="estoque-produto-desc-label">Descrição</span>
+                      <span className="estoque-produto-un">{p.unidade || '—'}</span>
+                    </span>
+                  </div>
+                  <div className="estoque-admin-linha-acoes">
+                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} layout="admin" />
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="estoque-btn-icon estoque-btn-icon--danger"
+                        title="Excluir item"
+                        aria-label={`Excluir ${p.nome}`}
+                        onClick={() => excluirProduto(p.id)}
+                      >
+                        <IconTrash width={20} height={20} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
@@ -153,41 +167,60 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 interface QEProps {
   produto: EstoqueProduto;
   onSave: (p: EstoqueProduto, v: string) => void;
-  mostrarRotulo?: boolean;
+  layout: 'operador' | 'admin';
 }
 
-const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, mostrarRotulo = true }) => {
-  const [val, setVal] = useState(String(produto.quantidade ?? ''));
+const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave, layout }) => {
+  const synced = qtdeInt(produto.quantidade);
+  const [val, setVal] = useState(synced);
+
   useEffect(() => {
-    setVal(String(produto.quantidade ?? ''));
+    setVal(qtdeInt(produto.quantidade));
   }, [produto.id, produto.quantidade]);
 
+  const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const onlyDigits = e.target.value.replace(/\D/g, '');
+    setVal(onlyDigits);
+  }, []);
+
+  const doSave = useCallback(() => {
+    onSave(produto, val);
+  }, [onSave, produto, val]);
+
+  const isOperador = layout === 'operador';
+
   return (
-    <div className={`estoque-qtd-row ${mostrarRotulo ? '' : 'estoque-qtd-row--inline'}`}>
-      {mostrarRotulo && (
-        <label className="estoque-qtd-label-visivel" htmlFor={`qtd-${produto.id}`}>
-          Quantidade
+    <div className={`estoque-qtd-editor estoque-qtd-editor--${layout}`}>
+      {!isOperador && (
+        <label className="estoque-qtd-editor-label" htmlFor={`qtd-${produto.id}`}>
+          Qtd.
         </label>
       )}
-      <div className="estoque-qtd-controls">
-        <input
-          id={`qtd-${produto.id}`}
-          className="estoque-input estoque-input-qtd"
-          inputMode="decimal"
-          autoComplete="off"
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onBlur={() => {
-            if (val !== String(produto.quantidade)) {
-              onSave(produto, val);
-            }
-          }}
-          aria-label={`Quantidade de ${produto.nome}`}
-        />
-        <button type="button" className="estoque-btn-primary estoque-btn-small" onClick={() => onSave(produto, val)}>
-          Salvar
-        </button>
-      </div>
+      {isOperador && (
+        <span className="estoque-qtd-editor-label estoque-qtd-editor-label--operador" id={`qtd-lbl-${produto.id}`}>
+          Qtd.
+        </span>
+      )}
+      <input
+        id={`qtd-${produto.id}`}
+        className="estoque-input estoque-input-qtd estoque-input-qtd--int"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="off"
+        value={val}
+        onChange={onInputChange}
+        aria-labelledby={isOperador ? `qtd-lbl-${produto.id}` : undefined}
+        aria-label={isOperador ? `Quantidade inteira de ${produto.nome}` : undefined}
+      />
+      <button
+        type="button"
+        className="estoque-btn-icon estoque-btn-icon--primary"
+        title="Salvar quantidade"
+        aria-label={`Salvar quantidade de ${produto.nome}`}
+        onClick={doSave}
+      >
+        <IconSave width={20} height={20} />
+      </button>
     </div>
   );
 };

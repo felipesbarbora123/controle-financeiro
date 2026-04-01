@@ -3,8 +3,9 @@
 ## Visão geral
 
 - **Categorias** e **produtos** por restaurante.
-- **Admin** (`usuarios.is_admin = true`): cadastra categorias e produtos (nome, unidade, categoria, quantidade inicial), edita tudo e exclui.
+- **Admin** (`usuarios.is_admin = true`): cadastra categorias e produtos (nome, unidade/descrição, categoria, quantidade inicial), edita tudo e exclui.
 - **Demais usuários**: só alteram **quantidade** (API valida).
+- **Quantidade**: sempre **inteiro ≥ 0** (sem decimais). A API rejeita valores fracionários ou não numéricos.
 - **Perfil estoque** (`usuarios.somente_estoque = true`): vê **apenas** o módulo Estoque no app; rotas `/api/gastos*` retornam **403**; **POST/PUT/DELETE** em `/api/restaurantes` também retornam **403** (apenas **GET** para escolher o restaurante no seletor).
 - **Restaurantes por usuário de estoque**: a tabela `usuario_restaurante_estoque` define em quais restaurantes cada usuário `somente_estoque` pode **ver e lançar** estoque. Fora dessa lista, **GET** `/api/restaurantes`, **GET** `/api/estoque/agrupado` e **PUT** de quantidade em produto retornam **403**.
 - **Administrador**: no app, aba **Usuários estoque** — criar/editar/excluir usuários `somente_estoque` e marcar os restaurantes de cada um.

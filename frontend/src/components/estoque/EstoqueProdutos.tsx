@@ -37,7 +37,7 @@ const EstoqueProdutos: React.FC<Props> = ({
         categoria_id: Number(novoProduto.categoria_id),
         nome: novoProduto.nome.trim(),
         unidade: (novoProduto.unidade && String(novoProduto.unidade).trim()) || 'un',
-        quantidade: parseFloat(String(novoProduto.quantidade).replace(',', '.')) || 0
+        quantidade: Math.max(0, parseInt(String(novoProduto.quantidade).replace(/\D/g, ''), 10) || 0)
       });
       setNovoProduto({ categoria_id: '', nome: '', unidade: '', quantidade: '0' });
       await onReload();
@@ -109,12 +109,16 @@ const EstoqueProdutos: React.FC<Props> = ({
               </datalist>
             </div>
             <div className="estoque-field-grow">
-              <label className="estoque-label">Qtd. inicial</label>
+              <label className="estoque-label">Qtd. inicial (inteiro)</label>
               <input
                 className="estoque-input"
-                inputMode="decimal"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={novoProduto.quantidade}
-                onChange={(e) => setNovoProduto((p) => ({ ...p, quantidade: e.target.value }))}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, '');
+                  setNovoProduto((p) => ({ ...p, quantidade: d === '' ? '0' : d }));
+                }}
                 placeholder="0"
               />
             </div>
@@ -143,7 +147,7 @@ const EstoqueProdutos: React.FC<Props> = ({
                         <div>
                           <span className="estoque-produto-flat-nome">{p.nome}</span>
                           <span className="estoque-produto-flat-meta">
-                            Qtd. {p.quantidade}
+                            Qtd. {Math.max(0, Math.round(Number(p.quantidade)) || 0)}
                             {p.unidade ? ` · ${p.unidade}` : ''}
                           </span>
                         </div>

@@ -74,6 +74,22 @@ async function assertEstoqueAcessoRestaurante(req, res, restauranteId) {
   return true;
 }
 
+/** Quantidade de estoque: sempre inteiro ≥ 0 */
+function parseEstoqueQuantidadeInt(raw) {
+  if (raw === undefined || raw === null) {
+    return { ok: false, error: 'quantidade é obrigatória' };
+  }
+  const s = String(raw).trim().replace(',', '.');
+  if (s === '' || !/^\d+$/.test(s)) {
+    return { ok: false, error: 'A quantidade deve ser um número inteiro (sem casas decimais).' };
+  }
+  const n = parseInt(s, 10);
+  if (n < 0) {
+    return { ok: false, error: 'A quantidade não pode ser negativa.' };
+  }
+  return { ok: true, value: n };
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -586,7 +602,8 @@ app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
     const produtosPorCat = {};
     prodResult.rows.forEach((p) => {
       if (!produtosPorCat[p.categoria_id]) produtosPorCat[p.categoria_id] = [];
-      produtosPorCat[p.categoria_id].push(p);
+      const qn = Math.max(0, Math.round(Number(p.quantidade)) || 0);
+      produtosPorCat[p.categoria_id].push({ ...p, quantidade: qn });
     });
 
     const categorias = catResult.rows.map((c) => ({
@@ -670,7 +687,13 @@ app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, r
       return res.status(400).json({ error: 'restaurante_id, categoria_id e nome são obrigatórios' });
     }
     const un = unidade && String(unidade).trim() !== '' ? String(unidade).trim().slice(0, 20) : 'un';
-    const qtd = quantidade !== undefined && quantidade !== null ? quantidade : 0;
+    const qParsed = parseEstoqueQuantidadeInt(
+      quantidade !== undefined && quantidade !== null ? quantidade : 0
+    );
+    if (!qParsed.ok) {
+      return res.status(400).json({ error: qParsed.error });
+    }
+    const qtd = qParsed.value;
     const result = await pool.query(
       `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade)
        VALUES ($1, $2, $3, $4, $5)
@@ -713,14 +736,23 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
         body.unidade !== undefined && String(body.unidade).trim() !== ''
           ? String(body.unidade).trim().slice(0, 20)
           : row.unidade;
-      const quantidade =
-        body.quantidade !== undefined && body.quantidade !== null ? body.quantidade : row.quantidade;
+      let quantidadeVal = row.quantidade;
+      if (body.quantidade !== undefined && body.quantidade !== null) {
+        const qp = parseEstoqueQuantidadeInt(body.quantidade);
+        if (!qp.ok) {
+          return res.status(400).json({ error: qp.error });
+        }
+        quantidadeVal = qp.value;
+      } else {
+        const qp = parseEstoqueQuantidadeInt(row.quantidade);
+        quantidadeVal = qp.ok ? qp.value : Math.max(0, Math.round(Number(row.quantidade)) || 0);
+      }
       const result = await pool.query(
         `UPDATE estoque_produtos
          SET categoria_id = $1, nome = $2, unidade = $3, quantidade = $4, updated_at = CURRENT_TIMESTAMP
          WHERE id = $5
          RETURNING *`,
-        [categoria_id, nome, unidade, quantidade, id]
+        [categoria_id, nome, unidade, quantidadeVal, id]
       );
       return res.json(result.rows[0]);
     }
@@ -729,13 +761,13 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
     if (body.quantidade === undefined || body.quantidade === null) {
       return res.status(400).json({ error: 'Informe quantidade para atualizar.' });
     }
-    const q = parseFloat(body.quantidade);
-    if (Number.isNaN(q)) {
-      return res.status(400).json({ error: 'quantidade inválida' });
+    const qp = parseEstoqueQuantidadeInt(body.quantidade);
+    if (!qp.ok) {
+      return res.status(400).json({ error: qp.error });
     }
     const result = await pool.query(
       `UPDATE estoque_produtos SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
-      [q, id]
+      [qp.value, id]
     );
     res.json(result.rows[0]);
   } catch (error) {
