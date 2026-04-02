@@ -23,11 +23,57 @@ function flattenProdutos(categorias: EstoqueCategoria[]): EstoqueProduto[] {
   return list;
 }
 
-/** Exibe quantidade como inteiro */
+/** Categorias que têm ao menos um produto, com produtos ordenados por nome */
+function categoriasComProdutosOrdenadas(categorias: EstoqueCategoria[]): EstoqueCategoria[] {
+  return categorias
+    .map((c) => ({
+      ...c,
+      produtos: [...(c.produtos || [])].sort((a, b) =>
+        a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+      )
+    }))
+    .filter((c) => c.produtos.length > 0);
+}
+
 function qtdeInt(q: string | number | null | undefined): string {
   const n = Math.max(0, Math.round(Number(q)) || 0);
   return String(n);
 }
+
+interface LinhaProps {
+  produto: EstoqueProduto;
+  salvarQuantidade: (produto: EstoqueProduto, valorTexto: string) => void | Promise<void>;
+  isAdmin: boolean;
+  excluirProduto: (id: number) => void | Promise<void>;
+}
+
+const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarQuantidade, isAdmin, excluirProduto }) => (
+  <li className="estoque-produto estoque-produto--admin-linha">
+    <div className="estoque-admin-linha-conteudo">
+      <div className="estoque-produto-info estoque-produto-info--simples">
+        <span className="estoque-produto-nome">{produto.nome}</span>
+        <span className="estoque-produto-desc-inline">
+          <span className="estoque-produto-desc-label">Descrição</span>
+          <span className="estoque-produto-un">{produto.unidade || '—'}</span>
+        </span>
+      </div>
+      <div className="estoque-admin-linha-acoes">
+        <QuantidadeEditor produto={produto} onSave={salvarQuantidade} />
+        {isAdmin && (
+          <button
+            type="button"
+            className="estoque-btn-icon estoque-btn-icon--danger"
+            title="Excluir item"
+            aria-label={`Excluir ${produto.nome}`}
+            onClick={() => excluirProduto(produto.id)}
+          >
+            <IconTrash width={20} height={20} />
+          </button>
+        )}
+      </div>
+    </div>
+  </li>
+);
 
 const EstoqueVisaoGeral: React.FC<Props> = ({
   categorias,
@@ -38,6 +84,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   onMessage
 }) => {
   const produtosPlano = useMemo(() => flattenProdutos(categorias), [categorias]);
+  const gruposOperador = useMemo(() => categoriasComProdutosOrdenadas(categorias), [categorias]);
 
   const salvarQuantidade = async (produto: EstoqueProduto, valorTexto: string) => {
     const s = String(valorTexto).trim();
@@ -73,7 +120,17 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
   const tituloTela = modoOperador ? 'Lançar estoque' : 'Itens';
 
-  const vazio = categorias.length === 0 || produtosPlano.length === 0;
+  const vazio = modoOperador
+    ? categorias.length === 0 || gruposOperador.length === 0
+    : categorias.length === 0 || produtosPlano.length === 0;
+
+  const emptyMsg = (
+    <p className="estoque-empty-msg">
+      {categorias.length === 0
+        ? `Nenhuma categoria cadastrada.${isAdmin ? ' Use a aba Categorias.' : ' Peça ao admin para cadastrar itens.'}`
+        : 'Nenhum produto neste restaurante.'}
+    </p>
+  );
 
   return (
     <div className="estoque-modulo estoque-modulo--screen">
@@ -86,9 +143,8 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {modoOperador && (
         <p className="estoque-operador-ajuda">
-          A <strong>quantidade</strong> é sempre um número inteiro (sem vírgula ou ponto). A <strong>descrição</strong>{' '}
-          lembra como o produto é contado. O restaurante é o selecionado no topo — você só vê as <strong>lojas</strong>{' '}
-          liberadas pelo administrador.
+          Itens agrupados por <strong>categoria</strong>. A <strong>quantidade</strong> é sempre inteira. O restaurante é o
+          selecionado no topo — você só vê as <strong>lojas</strong> liberadas pelo administrador.
         </p>
       )}
 
@@ -100,39 +156,36 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       <section className="estoque-lista estoque-lista--plana" aria-label="Itens de estoque">
         {vazio ? (
-          <p className="estoque-empty-msg">
-            {categorias.length === 0
-              ? `Nenhuma categoria cadastrada.${isAdmin ? ' Use a aba Categorias.' : ' Peça ao admin para cadastrar itens.'}`
-              : 'Nenhum produto neste restaurante.'}
-          </p>
+          emptyMsg
+        ) : modoOperador ? (
+          <div className="estoque-operador-por-categoria">
+            {gruposOperador.map((cat) => (
+              <div key={cat.id} className="estoque-operador-grupo">
+                <h3 className="estoque-operador-cat-titulo">{cat.nome}</h3>
+                <ul className="estoque-lista-plana estoque-lista-plana--admin estoque-lista-plana--grupo">
+                  {cat.produtos.map((p) => (
+                    <LinhaItemEstoque
+                      key={p.id}
+                      produto={p}
+                      salvarQuantidade={salvarQuantidade}
+                      isAdmin={false}
+                      excluirProduto={excluirProduto}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         ) : (
           <ul className="estoque-lista-plana estoque-lista-plana--admin">
             {produtosPlano.map((p) => (
-              <li key={p.id} className="estoque-produto estoque-produto--admin-linha">
-                <div className="estoque-admin-linha-conteudo">
-                  <div className="estoque-produto-info estoque-produto-info--simples">
-                    <span className="estoque-produto-nome">{p.nome}</span>
-                    <span className="estoque-produto-desc-inline">
-                      <span className="estoque-produto-desc-label">Descrição</span>
-                      <span className="estoque-produto-un">{p.unidade || '—'}</span>
-                    </span>
-                  </div>
-                  <div className="estoque-admin-linha-acoes">
-                    <QuantidadeEditor produto={p} onSave={salvarQuantidade} />
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        className="estoque-btn-icon estoque-btn-icon--danger"
-                        title="Excluir item"
-                        aria-label={`Excluir ${p.nome}`}
-                        onClick={() => excluirProduto(p.id)}
-                      >
-                        <IconTrash width={20} height={20} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </li>
+              <LinhaItemEstoque
+                key={p.id}
+                produto={p}
+                salvarQuantidade={salvarQuantidade}
+                isAdmin={isAdmin}
+                excluirProduto={excluirProduto}
+              />
             ))}
           </ul>
         )}

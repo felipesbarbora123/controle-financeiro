@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria } from './estoqueTypes';
 import { UNIDADES_SUGERIDAS } from './estoqueTypes';
+import { IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
 
 interface Props {
@@ -153,10 +154,12 @@ const EstoqueProdutos: React.FC<Props> = ({
                         </div>
                         <button
                           type="button"
-                          className="estoque-btn-danger estoque-btn-small"
+                          className="estoque-btn-icon estoque-btn-icon--danger"
+                          title="Excluir produto"
+                          aria-label={`Excluir ${p.nome}`}
                           onClick={() => excluir(p.id, p.nome)}
                         >
-                          Excluir
+                          <IconTrash width={20} height={20} />
                         </button>
                       </li>
                     ))}
