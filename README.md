@@ -54,6 +54,10 @@ Frontend (porta 3000):
 npm run client
 ```
 
+## Testes
+
+Testes unitários e de integração leve (Jest no backend, Testing Library no frontend). Detalhes e comandos: **[TESTING.md](./TESTING.md)**.
+
 ## Estrutura do Projeto
 
 ```

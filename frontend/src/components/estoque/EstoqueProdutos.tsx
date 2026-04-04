@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria } from './estoqueTypes';
 import { UNIDADES_SUGERIDAS } from './estoqueTypes';
 import { IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
+
+function filtrarCategoriasProdutos(cats: EstoqueCategoria[], needle: string): EstoqueCategoria[] {
+  const n = needle.trim().toLowerCase();
+  if (!n) return cats;
+  return cats
+    .map((c) => ({
+      ...c,
+      produtos: (c.produtos || []).filter(
+        (p) => p.nome.toLowerCase().includes(n) || (p.unidade || '').toLowerCase().includes(n)
+      )
+    }))
+    .filter((c) => (c.produtos || []).length > 0);
+}
 
 interface Props {
   restauranteId: number;
@@ -21,6 +34,9 @@ const EstoqueProdutos: React.FC<Props> = ({
   onReload,
   onMessage
 }) => {
+  const [busca, setBusca] = useState('');
+  const categoriasVis = useMemo(() => filtrarCategoriasProdutos(categorias, busca), [categorias, busca]);
+
   const [novoProduto, setNovoProduto] = useState({
     categoria_id: '' as string | number,
     nome: '',
@@ -132,13 +148,30 @@ const EstoqueProdutos: React.FC<Props> = ({
 
       <section className="estoque-admin-screen-card" aria-label="Produtos cadastrados">
         <h3 className="estoque-subsection-title">Produtos cadastrados</h3>
+        {!loading && categorias.some((c) => c.produtos?.length) && (
+          <div className="estoque-busca-wrap estoque-busca-wrap--inline">
+            <label className="estoque-busca-label" htmlFor="estoque-prod-busca">
+              Pesquisar
+            </label>
+            <input
+              id="estoque-prod-busca"
+              type="search"
+              className="estoque-input estoque-busca-input"
+              placeholder="Nome ou descrição…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
+        )}
         {loading ? (
           <p className="estoque-empty-msg">Carregando…</p>
         ) : categorias.every((c) => !c.produtos?.length) ? (
           <p className="estoque-empty-msg">Nenhum produto. Cadastre acima ou crie categorias primeiro.</p>
+        ) : categoriasVis.every((c) => !c.produtos?.length) ? (
+          <p className="estoque-empty-msg">Nenhum produto corresponde à pesquisa.</p>
         ) : (
           <div className="estoque-produto-table-wrap">
-            {categorias.map((cat) =>
+            {categoriasVis.map((cat) =>
               (cat.produtos || []).length ? (
                 <div key={cat.id} className="estoque-produto-group">
                   <h4 className="estoque-produto-group-title">{cat.nome}</h4>

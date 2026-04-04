@@ -40,6 +40,31 @@ function qtdeInt(q: string | number | null | undefined): string {
   return String(n);
 }
 
+function formatAtualizacao(iso?: string | null): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+}
+
+function filtrarCategoriasPorBusca(cats: EstoqueCategoria[], needle: string): EstoqueCategoria[] {
+  const n = needle.trim().toLowerCase();
+  if (!n) return cats;
+  return cats
+    .map((c) => ({
+      ...c,
+      produtos: (c.produtos || []).filter(
+        (p) =>
+          p.nome.toLowerCase().includes(n) ||
+          (p.unidade || '').toLowerCase().includes(n) ||
+          c.nome.toLowerCase().includes(n)
+      )
+    }))
+    .filter((c) => c.produtos.length > 0);
+}
+
 interface LinhaProps {
   produto: EstoqueProduto;
   salvarQuantidade: (produto: EstoqueProduto, valorTexto: string) => void | Promise<void>;
@@ -55,6 +80,9 @@ const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarQuantidade, isA
         <span className="estoque-produto-desc-inline">
           <span className="estoque-produto-desc-label">Descrição</span>
           <span className="estoque-produto-un">{produto.unidade || '—'}</span>
+        </span>
+        <span className="estoque-produto-atualizado" title="Última alteração da quantidade ou cadastro">
+          Atual.: {formatAtualizacao(produto.updated_at)}
         </span>
       </div>
       <div className="estoque-admin-linha-acoes">
@@ -83,8 +111,13 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   modoOperador = false,
   onMessage
 }) => {
-  const produtosPlano = useMemo(() => flattenProdutos(categorias), [categorias]);
-  const gruposOperador = useMemo(() => categoriasComProdutosOrdenadas(categorias), [categorias]);
+  const [busca, setBusca] = useState('');
+  const categoriasFiltradas = useMemo(
+    () => filtrarCategoriasPorBusca(categorias, busca),
+    [categorias, busca]
+  );
+  const produtosPlano = useMemo(() => flattenProdutos(categoriasFiltradas), [categoriasFiltradas]);
+  const gruposOperador = useMemo(() => categoriasComProdutosOrdenadas(categoriasFiltradas), [categoriasFiltradas]);
 
   const salvarQuantidade = async (produto: EstoqueProduto, valorTexto: string) => {
     const s = String(valorTexto).trim();
@@ -120,15 +153,19 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
   const tituloTela = modoOperador ? 'Lançar estoque' : 'Itens';
 
-  const vazio = modoOperador
-    ? categorias.length === 0 || gruposOperador.length === 0
-    : categorias.length === 0 || produtosPlano.length === 0;
+  const semItensNoRestaurante = categorias.length === 0 || flattenProdutos(categorias).length === 0;
+  const vazioLista =
+    modoOperador
+      ? categoriasFiltradas.length === 0 || gruposOperador.length === 0
+      : categoriasFiltradas.length === 0 || produtosPlano.length === 0;
 
   const emptyMsg = (
     <p className="estoque-empty-msg">
       {categorias.length === 0
         ? `Nenhuma categoria cadastrada.${isAdmin ? ' Use a aba Categorias.' : ' Peça ao admin para cadastrar itens.'}`
-        : 'Nenhum produto neste restaurante.'}
+        : semItensNoRestaurante
+          ? 'Nenhum produto neste restaurante.'
+          : 'Nenhum item corresponde à pesquisa.'}
     </p>
   );
 
@@ -154,8 +191,25 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
         </p>
       )}
 
+      {!semItensNoRestaurante && (
+        <div className="estoque-busca-wrap">
+          <label className="estoque-busca-label" htmlFor="estoque-busca-input">
+            Pesquisar
+          </label>
+          <input
+            id="estoque-busca-input"
+            type="search"
+            className="estoque-input estoque-busca-input"
+            placeholder="Nome, descrição ou categoria…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      )}
+
       <section className="estoque-lista estoque-lista--plana" aria-label="Itens de estoque">
-        {vazio ? (
+        {vazioLista ? (
           emptyMsg
         ) : modoOperador ? (
           <div className="estoque-operador-por-categoria">

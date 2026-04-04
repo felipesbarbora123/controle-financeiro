@@ -56,7 +56,7 @@ function App() {
       return 'gastos';
     }
   }); // 'inicio' | 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
-  const [estoqueView, setEstoqueView] = useState('visao'); // 'visao' | 'categorias' | 'produtos'
+  const [estoqueView, setEstoqueView] = useState('visao'); // visao | categorias | produtos | movimentacao
   const [msgEstoque, setMsgEstoque] = useState(null);
 
   useEffect(() => {
@@ -324,7 +324,8 @@ function App() {
   const restauranteAtual = restaurantes.find((r) => r.id === restauranteSelecionado);
 
   const irParaEstoque = (view = 'visao') => {
-    setEstoqueView(view);
+    const ok = ['visao', 'categorias', 'produtos', 'movimentacao'].includes(view);
+    setEstoqueView(ok ? view : 'visao');
     setTelaAtual('estoque');
     setMsgEstoque(null);
     // Após o painel montar, leva o usuário até o lançamento (feedback ao tocar na aba)

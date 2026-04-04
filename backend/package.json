@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "migrate": "node database/migrate.js",
-    "create-admin": "node database/create_admin.js"
+    "create-admin": "node database/create_admin.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +21,9 @@
     "dotenv": "^16.3.1",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
   }
 }

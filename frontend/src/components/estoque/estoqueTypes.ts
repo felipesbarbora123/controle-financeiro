@@ -5,6 +5,8 @@ export interface EstoqueProduto {
   nome: string;
   unidade: string;
   quantidade: string | number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EstoqueCategoria {
@@ -20,6 +22,6 @@ export interface EstoqueAgrupadoResponse {
   categorias: EstoqueCategoria[];
 }
 
-export type EstoqueView = 'visao' | 'categorias' | 'produtos';
+export type EstoqueView = 'visao' | 'categorias' | 'produtos' | 'movimentacao';
 
 export const UNIDADES_SUGERIDAS = ['un', 'kg', 'g', 'lt', 'ml', 'cx', 'fd', 'pct', 'dz'];

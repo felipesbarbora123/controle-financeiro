@@ -27,7 +27,8 @@ async function migrate() {
       '005_create_restaurante_modelo_and_update_gastos.sql',
       '003_add_retroativo_to_gastos.sql',
       '006_estoque_modulo.sql',
-      '007_usuario_restaurante_estoque.sql'
+      '007_usuario_restaurante_estoque.sql',
+      '008_estoque_movimentos.sql'
     ];
     
     for (const migrationFile of migrations) {

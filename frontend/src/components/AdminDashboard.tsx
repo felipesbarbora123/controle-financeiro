@@ -17,7 +17,7 @@ interface Props {
   gastos: GastoRow[];
   onIrParaGastos: () => void;
   onIrParaRelatorios: () => void;
-  onIrParaEstoque: (view?: 'visao' | 'categorias' | 'produtos') => void;
+  onIrParaEstoque: (view?: 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
   onIrParaRestaurantes: () => void;
   onIrParaUsuariosEstoque?: () => void;
 }
@@ -105,102 +105,62 @@ const AdminDashboard: React.FC<Props> = ({
   if (!restauranteId) {
     return (
       <div className="admin-dashboard admin-dashboard--empty">
-        <p>Selecione um restaurante no topo para ver o painel.</p>
+        <p>Selecione um restaurante no topo.</p>
         <button type="button" className="admin-dashboard-btn admin-dashboard-btn--primary" onClick={onIrParaRestaurantes}>
-          Gerenciar restaurantes
+          Restaurantes
         </button>
       </div>
     );
   }
 
   return (
-    <div className="admin-dashboard">
-      <header className="admin-dashboard-header">
-        <h1 className="admin-dashboard-title">Painel</h1>
+    <div className="admin-dashboard admin-dashboard--compact">
+      <header className="admin-dashboard-header admin-dashboard-header--compact">
+        <h1 className="admin-dashboard-title">Início</h1>
         {restauranteNome && <p className="admin-dashboard-sub">{restauranteNome}</p>}
-        <p className="admin-dashboard-hint">Resumo do mês atual (gastos) e estoque do restaurante selecionado.</p>
       </header>
 
-      <div className="admin-dashboard-grid">
-        <section className="admin-dashboard-card" aria-label="Gastos do mês">
-          <h2 className="admin-dashboard-card-title">Gastos (mês)</h2>
-          <div className="admin-dashboard-metrics">
-            <div className="admin-dashboard-metric">
-              <span className="admin-dashboard-metric-label">Total</span>
-              <span className="admin-dashboard-metric-value">
-                {resumoGastosMes.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </span>
-            </div>
-            <div className="admin-dashboard-metric">
-              <span className="admin-dashboard-metric-label">A pagar</span>
-              <span className="admin-dashboard-metric-value admin-dashboard-metric-value--warn">
-                {resumoGastosMes.pendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </span>
-            </div>
-            <div className="admin-dashboard-metric">
-              <span className="admin-dashboard-metric-label">Lançamentos</span>
-              <span className="admin-dashboard-metric-value">{resumoGastosMes.count}</span>
-            </div>
-          </div>
-          <div className="admin-dashboard-actions">
-            <button type="button" className="admin-dashboard-btn" onClick={onIrParaGastos}>
-              Abrir gastos
-            </button>
-            <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaRelatorios}>
-              Relatórios
-            </button>
-          </div>
-        </section>
-
-        <section className="admin-dashboard-card" aria-label="Estoque">
-          <h2 className="admin-dashboard-card-title">Estoque</h2>
-          {loadingEstoque ? (
-            <p className="admin-dashboard-loading">Carregando resumo…</p>
-          ) : (
-            <div className="admin-dashboard-metrics">
-              <div className="admin-dashboard-metric">
-                <span className="admin-dashboard-metric-label">Categorias</span>
-                <span className="admin-dashboard-metric-value">{numCategorias}</span>
-              </div>
-              <div className="admin-dashboard-metric">
-                <span className="admin-dashboard-metric-label">Produtos</span>
-                <span className="admin-dashboard-metric-value">{numProdutos}</span>
-              </div>
-            </div>
-          )}
-          <div className="admin-dashboard-actions admin-dashboard-actions--stack">
-            <button type="button" className="admin-dashboard-btn" onClick={() => onIrParaEstoque('visao')}>
-              Itens do estoque
-            </button>
-            <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('categorias')}>
-              Cadastro de categorias
-            </button>
-            <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('produtos')}>
-              Cadastro de produtos
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <section className="admin-dashboard-card admin-dashboard-card--wide">
-        <h2 className="admin-dashboard-card-title">Atalhos</h2>
-        <div className="admin-dashboard-shortcuts">
-          <button type="button" className="admin-dashboard-chip" onClick={onIrParaRestaurantes}>
-            Restaurantes
-          </button>
-          <button type="button" className="admin-dashboard-chip" onClick={onIrParaGastos}>
-            Lançar gastos
-          </button>
-          <button type="button" className="admin-dashboard-chip" onClick={() => onIrParaEstoque('visao')}>
-            Ver itens
-          </button>
-          {onIrParaUsuariosEstoque && (
-            <button type="button" className="admin-dashboard-chip" onClick={onIrParaUsuariosEstoque}>
-              Usuários de estoque
-            </button>
-          )}
-        </div>
+      <section className="admin-dashboard-strip" aria-label="Resumo do mês">
+        <p className="admin-dashboard-strip-line">
+          <strong>Gastos (mês):</strong>{' '}
+          {resumoGastosMes.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} total ·{' '}
+          {resumoGastosMes.pendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} a pagar ·{' '}
+          {resumoGastosMes.count} lanç.
+        </p>
+        <p className="admin-dashboard-strip-line">
+          <strong>Estoque:</strong>{' '}
+          {loadingEstoque ? '…' : `${numCategorias} categorias · ${numProdutos} produtos`}
+        </p>
       </section>
+
+      <nav className="admin-dashboard-actions-compact" aria-label="Ações rápidas">
+        <button type="button" className="admin-dashboard-btn" onClick={onIrParaGastos}>
+          Gastos
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaRelatorios}>
+          Relatórios
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('visao')}>
+          Itens estoque
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('movimentacao')}>
+          Movimentação
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('categorias')}>
+          Categorias
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('produtos')}>
+          Produtos
+        </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaRestaurantes}>
+          Restaurantes
+        </button>
+        {onIrParaUsuariosEstoque && (
+          <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaUsuariosEstoque}>
+            Usuários estoque
+          </button>
+        )}
+      </nav>
     </div>
   );
 };

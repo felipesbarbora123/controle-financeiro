@@ -10,6 +10,10 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
+const {
+  parseEstoqueQuantidadeInt,
+  normalizeQuantidadeInt
+} = require('./lib/estoqueQuantidade');
 
 /** Usuários com somente_estoque=true não acessam rotas financeiras (gastos). */
 const requireFinanceiroAccess = (req, res, next) => {
@@ -74,20 +78,39 @@ async function assertEstoqueAcessoRestaurante(req, res, restauranteId) {
   return true;
 }
 
-/** Quantidade de estoque: sempre inteiro ≥ 0 */
-function parseEstoqueQuantidadeInt(raw) {
-  if (raw === undefined || raw === null) {
-    return { ok: false, error: 'quantidade é obrigatória' };
-  }
-  const s = String(raw).trim().replace(',', '.');
-  if (s === '' || !/^\d+$/.test(s)) {
-    return { ok: false, error: 'A quantidade deve ser um número inteiro (sem casas decimais).' };
-  }
-  const n = parseInt(s, 10);
-  if (n < 0) {
-    return { ok: false, error: 'A quantidade não pode ser negativa.' };
-  }
-  return { ok: true, value: n };
+async function inserirMovimentoEstoque(client, { produtoId, restauranteId, usuarioId, antes, depois }) {
+  const a = normalizeQuantidadeInt(antes);
+  const d = normalizeQuantidadeInt(depois);
+  const dif = d - a;
+  if (dif === 0) return;
+  await client.query(
+    `INSERT INTO estoque_movimentos (produto_id, restaurante_id, usuario_id, quantidade_antes, quantidade_depois, diferenca)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [produtoId, restauranteId, usuarioId || null, a, d, dif]
+  );
+}
+
+function parseDateOnly(s) {
+  if (!s || typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? null : s;
+}
+
+/** Segunda-feira 00:00 até domingo (fim inclusivo como data) da semana que contém `ref` */
+function periodoSemanaContendo(ref = new Date()) {
+  const d = new Date(ref);
+  d.setHours(12, 0, 0, 0);
+  const dow = d.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  const seg = new Date(d);
+  seg.setDate(d.getDate() + diff);
+  seg.setHours(0, 0, 0, 0);
+  const dom = new Date(seg);
+  dom.setDate(seg.getDate() + 6);
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = (x) =>
+    `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+  return { data_inicio: iso(seg), data_fim: iso(dom) };
 }
 
 const app = express();
@@ -116,21 +139,22 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT, 10) || 5432,
 });
 
-// Log de debug para verificar variáveis (remover em produção se necessário)
-console.log('🔍 Configuração do Banco:');
-console.log('  DB_HOST:', process.env.DB_HOST || '(não definido)');
-console.log('  DB_PORT:', process.env.DB_PORT || '(não definido)');
-console.log('  DB_NAME:', process.env.DB_NAME || '(não definido)');
-console.log('  DB_USER:', process.env.DB_USER || '(não definido)');
+// Log de debug e ping inicial (evita ruído e conexão real em testes automatizados)
+if (process.env.NODE_ENV !== 'test') {
+  console.log('🔍 Configuração do Banco:');
+  console.log('  DB_HOST:', process.env.DB_HOST || '(não definido)');
+  console.log('  DB_PORT:', process.env.DB_PORT || '(não definido)');
+  console.log('  DB_NAME:', process.env.DB_NAME || '(não definido)');
+  console.log('  DB_USER:', process.env.DB_USER || '(não definido)');
 
-// Test database connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('Erro ao conectar ao banco de dados:', err);
-  } else {
-    console.log('Conectado ao PostgreSQL:', res.rows[0].now);
-  }
-});
+  pool.query('SELECT NOW()', (err, res) => {
+    if (err) {
+      console.error('Erro ao conectar ao banco de dados:', err);
+    } else {
+      console.log('Conectado ao PostgreSQL:', res.rows[0].now);
+    }
+  });
+}
 
 // Auth Routes
 // Login
@@ -681,52 +705,73 @@ app.delete('/api/estoque/categorias/:id', authenticateToken, requireAdmin, async
 
 // CRUD produtos
 app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, res) => {
+  const { restaurante_id, categoria_id, nome, unidade, quantidade } = req.body;
+  if (!restaurante_id || !categoria_id || !nome || String(nome).trim() === '') {
+    return res.status(400).json({ error: 'restaurante_id, categoria_id e nome são obrigatórios' });
+  }
+  const un = unidade && String(unidade).trim() !== '' ? String(unidade).trim().slice(0, 20) : 'un';
+  const qParsed = parseEstoqueQuantidadeInt(
+    quantidade !== undefined && quantidade !== null ? quantidade : 0
+  );
+  if (!qParsed.ok) {
+    return res.status(400).json({ error: qParsed.error });
+  }
+  const qtd = qParsed.value;
+  const client = await pool.connect();
   try {
-    const { restaurante_id, categoria_id, nome, unidade, quantidade } = req.body;
-    if (!restaurante_id || !categoria_id || !nome || String(nome).trim() === '') {
-      return res.status(400).json({ error: 'restaurante_id, categoria_id e nome são obrigatórios' });
-    }
-    const un = unidade && String(unidade).trim() !== '' ? String(unidade).trim().slice(0, 20) : 'un';
-    const qParsed = parseEstoqueQuantidadeInt(
-      quantidade !== undefined && quantidade !== null ? quantidade : 0
-    );
-    if (!qParsed.ok) {
-      return res.status(400).json({ error: qParsed.error });
-    }
-    const qtd = qParsed.value;
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
       [restaurante_id, categoria_id, String(nome).trim(), un, qtd]
     );
-    res.status(201).json(result.rows[0]);
+    const row = result.rows[0];
+    if (qtd > 0) {
+      await inserirMovimentoEstoque(client, {
+        produtoId: row.id,
+        restauranteId: row.restaurante_id,
+        usuarioId: req.user.id,
+        antes: 0,
+        depois: qtd
+      });
+    }
+    await client.query('COMMIT');
+    res.status(201).json(row);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Já existe um produto com este nome nesta categoria.' });
     }
     console.error('Erro ao criar produto:', error);
     res.status(500).json({ error: 'Erro ao criar produto' });
+  } finally {
+    client.release();
   }
 });
 
 app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const body = req.body || {};
+  const isAdmin = !!req.user.is_admin;
+
+  const existing = await pool.query('SELECT * FROM estoque_produtos WHERE id = $1', [id]);
+  if (existing.rows.length === 0) {
+    return res.status(404).json({ error: 'Produto não encontrado' });
+  }
+
+  const rowRestId = existing.rows[0].restaurante_id;
+  const pode = await assertEstoqueAcessoRestaurante(req, res, rowRestId);
+  if (!pode) return;
+
+  const client = await pool.connect();
   try {
-    const { id } = req.params;
-    const body = req.body || {};
-    const isAdmin = !!req.user.is_admin;
-
-    const existing = await pool.query('SELECT * FROM estoque_produtos WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Produto não encontrado' });
-    }
-
-    const rowRestId = existing.rows[0].restaurante_id;
-    const pode = await assertEstoqueAcessoRestaurante(req, res, rowRestId);
-    if (!pode) return;
+    await client.query('BEGIN');
+    const locked = await client.query('SELECT * FROM estoque_produtos WHERE id = $1 FOR UPDATE', [id]);
+    const row = locked.rows[0];
+    const antes = normalizeQuantidadeInt(row.quantidade);
 
     if (isAdmin) {
-      const row = existing.rows[0];
       const categoria_id = body.categoria_id !== undefined ? body.categoria_id : row.categoria_id;
       const nome =
         body.nome !== undefined && String(body.nome).trim() !== ''
@@ -736,43 +781,62 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
         body.unidade !== undefined && String(body.unidade).trim() !== ''
           ? String(body.unidade).trim().slice(0, 20)
           : row.unidade;
-      let quantidadeVal = row.quantidade;
+      let quantidadeVal = antes;
       if (body.quantidade !== undefined && body.quantidade !== null) {
         const qp = parseEstoqueQuantidadeInt(body.quantidade);
         if (!qp.ok) {
+          await client.query('ROLLBACK');
           return res.status(400).json({ error: qp.error });
         }
         quantidadeVal = qp.value;
-      } else {
-        const qp = parseEstoqueQuantidadeInt(row.quantidade);
-        quantidadeVal = qp.ok ? qp.value : Math.max(0, Math.round(Number(row.quantidade)) || 0);
       }
-      const result = await pool.query(
+      const result = await client.query(
         `UPDATE estoque_produtos
          SET categoria_id = $1, nome = $2, unidade = $3, quantidade = $4, updated_at = CURRENT_TIMESTAMP
          WHERE id = $5
          RETURNING *`,
         [categoria_id, nome, unidade, quantidadeVal, id]
       );
+      await inserirMovimentoEstoque(client, {
+        produtoId: Number(id),
+        restauranteId: row.restaurante_id,
+        usuarioId: req.user.id,
+        antes,
+        depois: quantidadeVal
+      });
+      await client.query('COMMIT');
       return res.json(result.rows[0]);
     }
 
-    // Não-admin: apenas quantidade
     if (body.quantidade === undefined || body.quantidade === null) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Informe quantidade para atualizar.' });
     }
     const qp = parseEstoqueQuantidadeInt(body.quantidade);
     if (!qp.ok) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: qp.error });
     }
-    const result = await pool.query(
+    const depois = qp.value;
+    const result = await client.query(
       `UPDATE estoque_produtos SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
-      [qp.value, id]
+      [depois, id]
     );
+    await inserirMovimentoEstoque(client, {
+      produtoId: Number(id),
+      restauranteId: row.restaurante_id,
+      usuarioId: req.user.id,
+      antes,
+      depois
+    });
+    await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao atualizar produto:', error);
     res.status(500).json({ error: 'Erro ao atualizar produto' });
+  } finally {
+    client.release();
   }
 });
 
@@ -787,6 +851,108 @@ app.delete('/api/estoque/produtos/:id', authenticateToken, requireAdmin, async (
   } catch (error) {
     console.error('Erro ao remover produto:', error);
     res.status(500).json({ error: 'Erro ao remover produto' });
+  }
+});
+
+// Resumo entradas/saídas por período (padrão: semana atual, seg–dom)
+app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) => {
+  try {
+    const rid = parseInt(req.query.restaurante_id, 10);
+    if (Number.isNaN(rid)) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+    if (!pode) return;
+
+    let dataInicio = parseDateOnly(req.query.data_inicio);
+    let dataFim = parseDateOnly(req.query.data_fim);
+    if (!dataInicio || !dataFim) {
+      const w = periodoSemanaContendo();
+      dataInicio = w.data_inicio;
+      dataFim = w.data_fim;
+    }
+    if (dataInicio > dataFim) {
+      return res.status(400).json({ error: 'data_inicio não pode ser maior que data_fim' });
+    }
+
+    const tot = await pool.query(
+      `SELECT
+        COALESCE(SUM(CASE WHEN diferenca > 0 THEN diferenca ELSE 0 END), 0)::int AS entradas,
+        COALESCE(SUM(CASE WHEN diferenca < 0 THEN -diferenca ELSE 0 END), 0)::int AS saidas
+       FROM estoque_movimentos
+       WHERE restaurante_id = $1
+         AND created_at::date >= $2::date
+         AND created_at::date <= $3::date`,
+      [rid, dataInicio, dataFim]
+    );
+
+    const porProduto = await pool.query(
+      `SELECT m.produto_id, p.nome,
+        COALESCE(SUM(CASE WHEN m.diferenca > 0 THEN m.diferenca ELSE 0 END), 0)::int AS entradas,
+        COALESCE(SUM(CASE WHEN m.diferenca < 0 THEN -m.diferenca ELSE 0 END), 0)::int AS saidas
+       FROM estoque_movimentos m
+       INNER JOIN estoque_produtos p ON p.id = m.produto_id
+       WHERE m.restaurante_id = $1
+         AND m.created_at::date >= $2::date
+         AND m.created_at::date <= $3::date
+       GROUP BY m.produto_id, p.nome
+       ORDER BY p.nome ASC`,
+      [rid, dataInicio, dataFim]
+    );
+
+    res.json({
+      restaurante_id: rid,
+      periodo: { data_inicio: dataInicio, data_fim: dataFim },
+      totais: tot.rows[0],
+      por_produto: porProduto.rows
+    });
+  } catch (error) {
+    console.error('Erro ao resumir movimentos:', error);
+    res.status(500).json({ error: 'Erro ao carregar resumo de movimentação' });
+  }
+});
+
+// Lista cronológica de lançamentos (últimos N)
+app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
+  try {
+    const rid = parseInt(req.query.restaurante_id, 10);
+    if (Number.isNaN(rid)) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+    if (!pode) return;
+
+    const dataInicio = parseDateOnly(req.query.data_inicio);
+    const dataFim = parseDateOnly(req.query.data_fim);
+    const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || 100, 1), 500);
+
+    let q = `
+      SELECT m.id, m.produto_id, p.nome AS produto_nome, m.quantidade_antes, m.quantidade_depois, m.diferenca,
+        m.created_at, u.nome AS usuario_nome
+      FROM estoque_movimentos m
+      INNER JOIN estoque_produtos p ON p.id = m.produto_id
+      LEFT JOIN usuarios u ON u.id = m.usuario_id
+      WHERE m.restaurante_id = $1`;
+    const params = [rid];
+    let idx = 2;
+    if (dataInicio) {
+      q += ` AND m.created_at::date >= $${idx}::date`;
+      params.push(dataInicio);
+      idx += 1;
+    }
+    if (dataFim) {
+      q += ` AND m.created_at::date <= $${idx}::date`;
+      params.push(dataFim);
+      idx += 1;
+    }
+    q += ` ORDER BY m.created_at DESC LIMIT $${idx}`;
+    params.push(limite);
+
+    const result = await pool.query(q, params);
+    res.json({ restaurante_id: rid, movimentos: result.rows });
+  } catch (error) {
+    console.error('Erro ao listar movimentos:', error);
+    res.status(500).json({ error: 'Erro ao listar movimentos' });
   }
 });
 
@@ -1003,40 +1169,42 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Iniciar servidor
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+module.exports = app;
 
-// Tratamento de sinais para encerramento gracioso
-process.on('SIGTERM', () => {
-  console.log('SIGTERM recebido, encerrando servidor graciosamente...');
-  server.close(() => {
-    console.log('Servidor encerrado');
-    pool.end(() => {
-      console.log('Pool de conexões fechado');
-      process.exit(0);
+// Só escuta porta quando o arquivo é executado diretamente (npm start / node server.js)
+if (require.main === module) {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM recebido, encerrando servidor graciosamente...');
+    server.close(() => {
+      console.log('Servidor encerrado');
+      pool.end(() => {
+        console.log('Pool de conexões fechado');
+        process.exit(0);
+      });
     });
   });
-});
 
-process.on('SIGINT', () => {
-  console.log('SIGINT recebido, encerrando servidor graciosamente...');
-  server.close(() => {
-    console.log('Servidor encerrado');
-    pool.end(() => {
-      console.log('Pool de conexões fechado');
-      process.exit(0);
+  process.on('SIGINT', () => {
+    console.log('SIGINT recebido, encerrando servidor graciosamente...');
+    server.close(() => {
+      console.log('Servidor encerrado');
+      pool.end(() => {
+        console.log('Pool de conexões fechado');
+        process.exit(0);
+      });
     });
   });
-});
 
-// Tratamento de erros não capturados
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
-});
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
+  });
+}
