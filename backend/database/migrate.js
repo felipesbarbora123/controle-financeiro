@@ -28,7 +28,8 @@ async function migrate() {
       '003_add_retroativo_to_gastos.sql',
       '006_estoque_modulo.sql',
       '007_usuario_restaurante_estoque.sql',
-      '008_estoque_movimentos.sql'
+      '008_estoque_movimentos.sql',
+      '009_estoque_movimentos_operacao_estorno.sql'
     ];
     
     for (const migrationFile of migrations) {

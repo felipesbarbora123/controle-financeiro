@@ -6,8 +6,11 @@ import '../Estoque.css';
 export interface ResumoMovimentosResponse {
   restaurante_id: number;
   periodo: { data_inicio: string; data_fim: string };
+  filtro?: { produto_id: number | null };
   totais: { entradas: number; saidas: number };
   por_produto: Array<{ produto_id: number; nome: string; entradas: number; saidas: number }>;
+  saidas_por_dia: Array<{ data: string; saidas: number }>;
+  saldos: Array<{ produto_id: number; nome: string; saldo_atual: number }>;
 }
 
 interface MovimentoRow {
@@ -17,6 +20,12 @@ interface MovimentoRow {
   quantidade_antes: number;
   quantidade_depois: number;
   diferenca: number;
+  tipo?: string;
+  quantidade?: number;
+  observacao?: string | null;
+  estornado?: boolean;
+  estornado_por_movimento_id?: number | null;
+  movimento_estorno_de_id?: number | null;
   created_at: string;
   usuario_nome: string | null;
 }
@@ -24,6 +33,7 @@ interface MovimentoRow {
 interface Props {
   restauranteId: number;
   onMessage?: (msg: string | null) => void;
+  periodoPreset?: { data_inicio: string; data_fim: string; token: number } | null;
 }
 
 function addDays(isoDate: string, days: number): string {
@@ -43,7 +53,7 @@ function formatarDataHora(iso: string): string {
   }
 }
 
-const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
+const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, periodoPreset }) => {
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
 
@@ -51,6 +61,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
   const [dataFim, setDataFim] = useState('');
   const [resumo, setResumo] = useState<ResumoMovimentosResponse | null>(null);
   const [lista, setLista] = useState<MovimentoRow[]>([]);
+  const [produtoId, setProdutoId] = useState('');
   const [loading, setLoading] = useState(true);
 
   const carregar = useCallback(
@@ -63,6 +74,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
           paramsResumo.data_inicio = inicio;
           paramsResumo.data_fim = fim;
         }
+        if (produtoId) paramsResumo.produto_id = produtoId;
         const paramsLista: Record<string, string | number> = {
           restaurante_id: restauranteId,
           limite: 80
@@ -71,6 +83,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
           paramsLista.data_inicio = inicio;
           paramsLista.data_fim = fim;
         }
+        if (produtoId) paramsLista.produto_id = produtoId;
 
         const [rRes, lRes] = await Promise.all([
           axios.get<ResumoMovimentosResponse>(`${API_URL}/estoque/movimentos/resumo`, { params: paramsResumo }),
@@ -89,16 +102,35 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
         setLoading(false);
       }
     },
-    [restauranteId]
+    [restauranteId, produtoId]
   );
 
   useEffect(() => {
     carregar();
   }, [restauranteId, carregar]);
 
+  useEffect(() => {
+    if (!periodoPreset?.data_inicio || !periodoPreset?.data_fim) return;
+    setDataInicio(periodoPreset.data_inicio);
+    setDataFim(periodoPreset.data_fim);
+    carregar(periodoPreset.data_inicio, periodoPreset.data_fim);
+  }, [periodoPreset?.token, carregar, periodoPreset]);
+
   const aplicarPeriodoDigitado = () => {
     if (!dataInicio || !dataFim) return;
     carregar(dataInicio, dataFim);
+  };
+
+  const estornarMovimento = async (id: number) => {
+    if (!window.confirm('Estornar este lançamento incorreto?')) return;
+    onMessageRef.current?.(null);
+    try {
+      await axios.post(`${API_URL}/estoque/movimentos/${id}/estornar`);
+      await carregar(dataInicio, dataFim);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { error?: string } } };
+      onMessageRef.current?.(ax.response?.data?.error || 'Não foi possível estornar o lançamento.');
+    }
   };
 
   const semanaAtual = () => {
@@ -156,6 +188,21 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
           <button type="button" className="estoque-btn-primary estoque-btn-small" onClick={aplicarPeriodoDigitado}>
             Aplicar
           </button>
+          <label className="estoque-movimentacao-label">
+            Produto
+            <select
+              className="estoque-input estoque-input--date"
+              value={produtoId}
+              onChange={(e) => setProdutoId(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {(resumo?.saldos || []).map((p) => (
+                <option key={p.produto_id} value={String(p.produto_id)}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="estoque-movimentacao-nav-semana">
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={semanaAnterior}>
@@ -214,6 +261,30 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
             )}
           </section>
 
+          <section className="estoque-movimentacao-tabela-wrap" aria-label="Saídas por dia">
+            <h3 className="estoque-subsection-title">Saídas diárias</h3>
+            {resumo.saidas_por_dia.length === 0 ? (
+              <p className="estoque-empty-msg">Sem saídas no período.</p>
+            ) : (
+              <table className="estoque-movimentacao-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Saídas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumo.saidas_por_dia.map((row) => (
+                    <tr key={row.data}>
+                      <td>{row.data}</td>
+                      <td>{row.saidas}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+
           <section className="estoque-movimentacao-lista" aria-label="Últimos lançamentos">
             <h3 className="estoque-subsection-title">Últimos lançamentos</h3>
             {lista.length === 0 ? (
@@ -228,9 +299,19 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage }) => {
                       {m.diferenca > 0 ? `+${m.diferenca}` : m.diferenca}
                     </span>
                     <span className="estoque-movimentacao-li-meta">
-                      {m.quantidade_antes} → {m.quantidade_depois}
-                      {m.usuario_nome ? ` · ${m.usuario_nome}` : ''}
+                      {m.quantidade_antes} → {m.quantidade_depois} · {m.tipo || 'ajuste'}
+                      {m.usuario_nome ? ` · ${m.usuario_nome}` : ''} {m.observacao ? ` · ${m.observacao}` : ''}
+                      {m.estornado ? ' · ESTORNADO' : ''}
                     </span>
+                    {!m.estornado && !m.movimento_estorno_de_id && (
+                      <button
+                        type="button"
+                        className="estoque-btn-secondary estoque-btn-small"
+                        onClick={() => estornarMovimento(m.id)}
+                      >
+                        Estornar
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

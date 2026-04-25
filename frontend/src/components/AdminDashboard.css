@@ -195,6 +195,19 @@
   color: #334155;
 }
 
+.admin-dashboard-strip-link {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.admin-dashboard-strip-link:disabled {
+  cursor: default;
+}
+
 .admin-dashboard-strip-line:last-child {
   margin-bottom: 0;
 }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
@@ -35,11 +35,6 @@ function categoriasComProdutosOrdenadas(categorias: EstoqueCategoria[]): Estoque
     .filter((c) => c.produtos.length > 0);
 }
 
-function qtdeInt(q: string | number | null | undefined): string {
-  const n = Math.max(0, Math.round(Number(q)) || 0);
-  return String(n);
-}
-
 function formatAtualizacao(iso?: string | null): string {
   if (!iso) return '—';
   try {
@@ -67,13 +62,28 @@ function filtrarCategoriasPorBusca(cats: EstoqueCategoria[], needle: string): Es
 
 interface LinhaProps {
   produto: EstoqueProduto;
-  salvarQuantidade: (produto: EstoqueProduto, valorTexto: string) => void | Promise<void>;
+  salvarMovimento: (
+    produto: EstoqueProduto,
+    tipo: 'entrada' | 'saida',
+    valorTexto: string,
+    observacao: string
+  ) => void | Promise<void>;
   isAdmin: boolean;
   excluirProduto: (id: number) => void | Promise<void>;
 }
 
-const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarQuantidade, isAdmin, excluirProduto }) => (
-  <li className="estoque-produto estoque-produto--admin-linha">
+function classeAtualizacao(iso?: string | null): string {
+  if (!iso) return '';
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return '';
+  const dias = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+  if (dias > 2) return 'estoque-produto--atraso-critico';
+  if (dias > 1) return 'estoque-produto--atraso-alerta';
+  return '';
+}
+
+const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAdmin, excluirProduto }) => (
+  <li className={`estoque-produto estoque-produto--admin-linha ${classeAtualizacao(produto.updated_at)}`.trim()}>
     <div className="estoque-admin-linha-conteudo">
       <div className="estoque-produto-info estoque-produto-info--simples">
         <span className="estoque-produto-nome">{produto.nome}</span>
@@ -86,7 +96,7 @@ const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarQuantidade, isA
         </span>
       </div>
       <div className="estoque-admin-linha-acoes">
-        <QuantidadeEditor produto={produto} onSave={salvarQuantidade} />
+        <MovimentoEditor produto={produto} onSave={salvarMovimento} />
         {isAdmin && (
           <button
             type="button"
@@ -119,16 +129,29 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   const produtosPlano = useMemo(() => flattenProdutos(categoriasFiltradas), [categoriasFiltradas]);
   const gruposOperador = useMemo(() => categoriasComProdutosOrdenadas(categoriasFiltradas), [categoriasFiltradas]);
 
-  const salvarQuantidade = async (produto: EstoqueProduto, valorTexto: string) => {
+  const salvarMovimento = async (
+    produto: EstoqueProduto,
+    tipo: 'entrada' | 'saida',
+    valorTexto: string,
+    observacao: string
+  ) => {
     const s = String(valorTexto).trim();
     if (s === '' || !/^\d+$/.test(s)) {
       onMessage?.('Informe uma quantidade inteira (sem decimais).');
       return;
     }
     const q = parseInt(s, 10);
+    if (q <= 0) {
+      onMessage?.('Quantidade deve ser maior que zero.');
+      return;
+    }
     onMessage?.(null);
     try {
-      await axios.put(`${API_URL}/estoque/produtos/${produto.id}`, { quantidade: q });
+      await axios.post(`${API_URL}/estoque/produtos/${produto.id}/movimentar`, {
+        tipo,
+        quantidade: q,
+        observacao: (observacao || '').trim()
+      });
       await onReload();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -187,7 +210,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {!modoOperador && isAdmin && (
         <p className="estoque-admin-visao-hint">
-          Quantidades inteiras. Para categorias e cadastro de produtos, use as abas acima.
+          Lançamentos por entrada/saída. Item sem atualização há mais de 1 dia fica amarelo; mais de 2 dias, vermelho.
         </p>
       )}
 
@@ -221,7 +244,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
                     <LinhaItemEstoque
                       key={p.id}
                       produto={p}
-                      salvarQuantidade={salvarQuantidade}
+                      salvarMovimento={salvarMovimento}
                       isAdmin={false}
                       excluirProduto={excluirProduto}
                     />
@@ -236,7 +259,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
               <LinhaItemEstoque
                 key={p.id}
                 produto={p}
-                salvarQuantidade={salvarQuantidade}
+                salvarMovimento={salvarMovimento}
                 isAdmin={isAdmin}
                 excluirProduto={excluirProduto}
               />
@@ -250,31 +273,36 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
 interface QEProps {
   produto: EstoqueProduto;
-  onSave: (p: EstoqueProduto, v: string) => void;
+  onSave: (p: EstoqueProduto, tipo: 'entrada' | 'saida', v: string, observacao: string) => void;
 }
 
-const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave }) => {
-  const synced = qtdeInt(produto.quantidade);
-  const [val, setVal] = useState(synced);
-
-  useEffect(() => {
-    setVal(qtdeInt(produto.quantidade));
-  }, [produto.id, produto.quantidade]);
+const MovimentoEditor: React.FC<QEProps> = ({ produto, onSave }) => {
+  const [val, setVal] = useState('1');
+  const [tipo, setTipo] = useState<'entrada' | 'saida'>('saida');
+  const [observacao, setObservacao] = useState('');
 
   const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const onlyDigits = e.target.value.replace(/\D/g, '');
-    setVal(onlyDigits);
+    setVal(onlyDigits === '' ? '' : onlyDigits);
   }, []);
 
   const doSave = useCallback(() => {
-    onSave(produto, val);
-  }, [onSave, produto, val]);
+    onSave(produto, tipo, val, observacao);
+    setVal('1');
+    setObservacao('');
+  }, [onSave, produto, tipo, val, observacao]);
 
   return (
     <div className="estoque-qtd-editor estoque-qtd-editor--admin">
-      <label className="estoque-qtd-editor-label" htmlFor={`qtd-${produto.id}`}>
-        Qtd.
-      </label>
+      <select
+        className="estoque-input estoque-input--mov-tipo"
+        value={tipo}
+        onChange={(e) => setTipo(e.target.value === 'entrada' ? 'entrada' : 'saida')}
+        aria-label={`Tipo de lançamento para ${produto.nome}`}
+      >
+        <option value="saida">Saída</option>
+        <option value="entrada">Entrada</option>
+      </select>
       <input
         id={`qtd-${produto.id}`}
         className="estoque-input estoque-input-qtd estoque-input-qtd--int"
@@ -283,13 +311,20 @@ const QuantidadeEditor: React.FC<QEProps> = ({ produto, onSave }) => {
         autoComplete="off"
         value={val}
         onChange={onInputChange}
-        aria-label={`Quantidade inteira de ${produto.nome}`}
+        aria-label={`Quantidade do lançamento para ${produto.nome}`}
+      />
+      <input
+        className="estoque-input estoque-input--mov-obs"
+        value={observacao}
+        onChange={(e) => setObservacao(e.target.value)}
+        placeholder="Obs. (opcional)"
+        aria-label={`Observação do lançamento para ${produto.nome}`}
       />
       <button
         type="button"
         className="estoque-btn-icon estoque-btn-icon--primary"
-        title="Salvar quantidade"
-        aria-label={`Salvar quantidade de ${produto.nome}`}
+        title="Lançar movimento"
+        aria-label={`Lançar movimento de ${produto.nome}`}
         onClick={doSave}
       >
         <IconSave width={20} height={20} />

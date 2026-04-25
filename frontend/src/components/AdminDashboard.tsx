@@ -11,6 +11,11 @@ interface GastoRow {
   data?: string;
 }
 
+interface ResumoMovimentosResponse {
+  totais: { entradas: number; saidas: number };
+  saidas_por_dia: Array<{ data: string; saidas: number }>;
+}
+
 interface Props {
   restauranteId: number | null;
   restauranteNome?: string;
@@ -18,6 +23,7 @@ interface Props {
   onIrParaGastos: () => void;
   onIrParaRelatorios: () => void;
   onIrParaEstoque: (view?: 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
+  onIrParaMovimentacaoHoje?: () => void;
   onIrParaRestaurantes: () => void;
   onIrParaUsuariosEstoque?: () => void;
 }
@@ -46,12 +52,24 @@ const AdminDashboard: React.FC<Props> = ({
   onIrParaGastos,
   onIrParaRelatorios,
   onIrParaEstoque,
+  onIrParaMovimentacaoHoje,
   onIrParaRestaurantes,
   onIrParaUsuariosEstoque
 }) => {
   const [loadingEstoque, setLoadingEstoque] = useState(true);
   const [numCategorias, setNumCategorias] = useState(0);
   const [numProdutos, setNumProdutos] = useState(0);
+  const [loadingMovHoje, setLoadingMovHoje] = useState(true);
+  const [entradasHoje, setEntradasHoje] = useState(0);
+  const [saidasHoje, setSaidasHoje] = useState(0);
+
+  const dataHojeIso = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
 
   const carregarResumoEstoque = useCallback(async () => {
     if (!restauranteId) {
@@ -83,6 +101,39 @@ const AdminDashboard: React.FC<Props> = ({
   useEffect(() => {
     carregarResumoEstoque();
   }, [carregarResumoEstoque]);
+
+  const carregarMovimentosHoje = useCallback(async () => {
+    if (!restauranteId) {
+      setEntradasHoje(0);
+      setSaidasHoje(0);
+      setLoadingMovHoje(false);
+      return;
+    }
+    setLoadingMovHoje(true);
+    try {
+      const { data } = await axios.get<ResumoMovimentosResponse>(`${API_URL}/estoque/movimentos/resumo`, {
+        params: {
+          restaurante_id: restauranteId,
+          data_inicio: dataHojeIso,
+          data_fim: dataHojeIso
+        }
+      });
+      const entradas = Number(data?.totais?.entradas || 0);
+      const saidasTotais = Number(data?.totais?.saidas || 0);
+      const saidasDoDia = Array.isArray(data?.saidas_por_dia) ? data.saidas_por_dia[0]?.saidas : undefined;
+      setEntradasHoje(entradas);
+      setSaidasHoje(Number(saidasDoDia ?? saidasTotais ?? 0));
+    } catch {
+      setEntradasHoje(0);
+      setSaidasHoje(0);
+    } finally {
+      setLoadingMovHoje(false);
+    }
+  }, [restauranteId, dataHojeIso]);
+
+  useEffect(() => {
+    carregarMovimentosHoje();
+  }, [carregarMovimentosHoje]);
 
   const { ini, fim } = useMemo(() => inicioFimMesAtual(), []);
 
@@ -131,6 +182,16 @@ const AdminDashboard: React.FC<Props> = ({
           <strong>Estoque:</strong>{' '}
           {loadingEstoque ? '…' : `${numCategorias} categorias · ${numProdutos} produtos`}
         </p>
+        <button
+          type="button"
+          className="admin-dashboard-strip-line admin-dashboard-strip-link"
+          onClick={onIrParaMovimentacaoHoje}
+          disabled={loadingMovHoje || !onIrParaMovimentacaoHoje}
+          title="Abrir movimentação filtrada no dia de hoje"
+        >
+          <strong>Movimento hoje:</strong>{' '}
+          {loadingMovHoje ? '…' : `${entradasHoje} entradas · ${saidasHoje} saídas`}
+        </button>
       </section>
 
       <nav className="admin-dashboard-actions-compact" aria-label="Ações rápidas">

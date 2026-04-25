@@ -58,6 +58,7 @@ function App() {
   }); // 'inicio' | 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
   const [estoqueView, setEstoqueView] = useState('visao'); // visao | categorias | produtos | movimentacao
   const [msgEstoque, setMsgEstoque] = useState(null);
+  const [estoqueMovPresetPeriodo, setEstoqueMovPresetPeriodo] = useState(null);
 
   useEffect(() => {
     verificarAutenticacao();
@@ -323,9 +324,27 @@ function App() {
 
   const restauranteAtual = restaurantes.find((r) => r.id === restauranteSelecionado);
 
-  const irParaEstoque = (view = 'visao') => {
+  const hojeIso = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const irParaEstoque = (view = 'visao', opts = {}) => {
     const ok = ['visao', 'categorias', 'produtos', 'movimentacao'].includes(view);
     setEstoqueView(ok ? view : 'visao');
+    if (opts?.periodoHoje && view === 'movimentacao') {
+      const h = hojeIso();
+      setEstoqueMovPresetPeriodo({
+        data_inicio: h,
+        data_fim: h,
+        token: Date.now()
+      });
+    } else {
+      setEstoqueMovPresetPeriodo(null);
+    }
     setTelaAtual('estoque');
     setMsgEstoque(null);
     // Após o painel montar, leva o usuário até o lançamento (feedback ao tocar na aba)
@@ -449,6 +468,7 @@ function App() {
             onIrParaGastos={() => setTelaAtual('gastos')}
             onIrParaRelatorios={() => setTelaAtual('relatorios')}
             onIrParaEstoque={(view) => irParaEstoque(view || 'visao')}
+            onIrParaMovimentacaoHoje={() => irParaEstoque('movimentacao', { periodoHoje: true })}
             onIrParaRestaurantes={() => setTelaAtual('restaurantes')}
             onIrParaUsuariosEstoque={() => {
               setError(null);
@@ -467,6 +487,7 @@ function App() {
               view={estoqueView}
               onViewChange={setEstoqueView}
               onMessage={setMsgEstoque}
+              movimentoPeriodoPreset={estoqueMovPresetPeriodo}
             />
           )
         ) : telaAtual === 'gastos' ? (

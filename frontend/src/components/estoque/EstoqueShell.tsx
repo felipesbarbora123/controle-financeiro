@@ -14,6 +14,7 @@ interface Props {
   view: EstoqueView;
   onViewChange: (v: EstoqueView) => void;
   onMessage?: (msg: string | null) => void;
+  movimentoPeriodoPreset?: { data_inicio: string; data_fim: string; token: number } | null;
 }
 
 const EstoqueShell: React.FC<Props> = ({
@@ -21,7 +22,8 @@ const EstoqueShell: React.FC<Props> = ({
   isAdmin,
   view,
   onViewChange,
-  onMessage
+  onMessage,
+  movimentoPeriodoPreset
 }) => {
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<EstoqueCategoria[]>([]);
@@ -105,7 +107,11 @@ const EstoqueShell: React.FC<Props> = ({
           />
         )}
         {effectiveView === 'movimentacao' && (
-          <EstoqueMovimentacao restauranteId={restauranteId} onMessage={onMessage} />
+          <EstoqueMovimentacao
+            restauranteId={restauranteId}
+            onMessage={onMessage}
+            periodoPreset={movimentoPeriodoPreset}
+          />
         )}
         {effectiveView === 'categorias' && isAdmin && (
           <EstoqueCategorias

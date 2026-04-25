@@ -7,8 +7,12 @@
 - **Demais usuários**: só alteram **quantidade** (API valida).
 - **Quantidade**: sempre **inteiro ≥ 0** (sem decimais). A API rejeita valores fracionários ou não numéricos.
 - **Movimentação**: cada alteração de quantidade gera registro em `estoque_movimentos` (`quantidade_antes`, `quantidade_depois`, `diferenca`). `diferenca > 0` = entrada, `< 0` = saída (ex.: 10→8 ⇒ −2 saídas). Cadastro com qtd inicial > 0 gera entrada a partir de 0.
+- **Lançamento operacional**: a tela principal agora lança **entrada/saída explícita** por quantidade (não apenas ajuste de saldo).
+- **Correção de erro**: cada lançamento pode ser **estornado** (gera um movimento inverso com rastreabilidade).
+- **Auditoria**: grava **operador**, **data/hora**, tipo (`entrada`, `saida`, `ajuste`, `estorno`) e observação opcional.
 - **Relatório**: `GET /api/estoque/movimentos/resumo` — totais e por produto no período (padrão: semana corrente, segunda–domingo). `GET /api/estoque/movimentos` — últimos lançamentos (auditoria).
 - Migração **`008_estoque_movimentos.sql`**: tabela `estoque_movimentos`.
+- Migração **`009_estoque_movimentos_operacao_estorno.sql`**: campos de tipo/quantidade/observação e estorno.
 - **Perfil estoque** (`usuarios.somente_estoque = true`): vê **apenas** o módulo Estoque no app; rotas `/api/gastos*` retornam **403**; **POST/PUT/DELETE** em `/api/restaurantes` também retornam **403** (apenas **GET** para escolher o restaurante no seletor).
 - **Restaurantes por usuário de estoque**: a tabela `usuario_restaurante_estoque` define em quais restaurantes cada usuário `somente_estoque` pode **ver e lançar** estoque. Fora dessa lista, **GET** `/api/restaurantes`, **GET** `/api/estoque/agrupado` e **PUT** de quantidade em produto retornam **403**.
 - **Administrador**: no app, aba **Usuários estoque** — criar/editar/excluir usuários `somente_estoque` e marcar os restaurantes de cada um.
@@ -21,6 +25,8 @@ Arquivos:
 
 - `006_estoque_modulo.sql` — coluna `somente_estoque`, tabelas de estoque.
 - `007_usuario_restaurante_estoque.sql` — vínculo usuário ↔ restaurante para perfil estoque (e backfill: quem já era `somente_estoque` ganha acesso a todos os restaurantes ativos).
+- `008_estoque_movimentos.sql` — histórico base de movimentos.
+- `009_estoque_movimentos_operacao_estorno.sql` — operação explícita e estorno.
 
 Conteúdo principal (006):
 

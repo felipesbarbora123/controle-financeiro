@@ -78,15 +78,29 @@ async function assertEstoqueAcessoRestaurante(req, res, restauranteId) {
   return true;
 }
 
-async function inserirMovimentoEstoque(client, { produtoId, restauranteId, usuarioId, antes, depois }) {
+function parseTipoMovimento(tipoRaw) {
+  const t = String(tipoRaw || '').trim().toLowerCase();
+  if (t === 'entrada' || t === 'saida' || t === 'ajuste' || t === 'estorno') return t;
+  return null;
+}
+
+async function inserirMovimentoEstoque(
+  client,
+  { produtoId, restauranteId, usuarioId, antes, depois, tipo = null, observacao = null, movimentoEstornoDeId = null }
+) {
   const a = normalizeQuantidadeInt(antes);
   const d = normalizeQuantidadeInt(depois);
   const dif = d - a;
   if (dif === 0) return;
+  const tipoMov = parseTipoMovimento(tipo) || (dif >= 0 ? 'entrada' : 'saida');
+  const quantidade = Math.abs(dif);
   await client.query(
-    `INSERT INTO estoque_movimentos (produto_id, restaurante_id, usuario_id, quantidade_antes, quantidade_depois, diferenca)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [produtoId, restauranteId, usuarioId || null, a, d, dif]
+    `INSERT INTO estoque_movimentos (
+      produto_id, restaurante_id, usuario_id, quantidade_antes, quantidade_depois, diferenca, tipo, quantidade, observacao, movimento_estorno_de_id
+    )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10)
+     RETURNING *`,
+    [produtoId, restauranteId, usuarioId || null, a, d, dif, tipoMov, quantidade, observacao || null, movimentoEstornoDeId]
   );
 }
 
@@ -802,7 +816,8 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
         restauranteId: row.restaurante_id,
         usuarioId: req.user.id,
         antes,
-        depois: quantidadeVal
+        depois: quantidadeVal,
+        tipo: 'ajuste'
       });
       await client.query('COMMIT');
       return res.json(result.rows[0]);
@@ -827,7 +842,8 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
       restauranteId: row.restaurante_id,
       usuarioId: req.user.id,
       antes,
-      depois
+      depois,
+      tipo: 'ajuste'
     });
     await client.query('COMMIT');
     res.json(result.rows[0]);
@@ -854,6 +870,156 @@ app.delete('/api/estoque/produtos/:id', authenticateToken, requireAdmin, async (
   }
 });
 
+// Lançamento explícito de entrada/saída (quantidade)
+app.post('/api/estoque/produtos/:id/movimentar', authenticateToken, async (req, res) => {
+  const produtoId = parseInt(req.params.id, 10);
+  if (Number.isNaN(produtoId)) {
+    return res.status(400).json({ error: 'id de produto inválido' });
+  }
+  const tipo = parseTipoMovimento(req.body?.tipo);
+  if (tipo !== 'entrada' && tipo !== 'saida') {
+    return res.status(400).json({ error: "tipo deve ser 'entrada' ou 'saida'" });
+  }
+  const qp = parseEstoqueQuantidadeInt(req.body?.quantidade);
+  if (!qp.ok || qp.value <= 0) {
+    return res.status(400).json({ error: 'quantidade deve ser inteiro maior que zero' });
+  }
+  const observacao = req.body?.observacao ? String(req.body.observacao).trim().slice(0, 300) : null;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query('SELECT * FROM estoque_produtos WHERE id = $1 FOR UPDATE', [produtoId]);
+    if (locked.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+    const prod = locked.rows[0];
+    const pode = await assertEstoqueAcessoRestaurante(req, res, prod.restaurante_id);
+    if (!pode) {
+      await client.query('ROLLBACK');
+      return;
+    }
+    const antes = normalizeQuantidadeInt(prod.quantidade);
+    const delta = tipo === 'entrada' ? qp.value : -qp.value;
+    const depois = antes + delta;
+    if (depois < 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Saída maior que o saldo atual do produto.' });
+    }
+    const upd = await client.query(
+      'UPDATE estoque_produtos SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [depois, produtoId]
+    );
+    await inserirMovimentoEstoque(client, {
+      produtoId,
+      restauranteId: prod.restaurante_id,
+      usuarioId: req.user.id,
+      antes,
+      depois,
+      tipo,
+      observacao
+    });
+    await client.query('COMMIT');
+    res.json(upd.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao lançar movimentação:', error);
+    res.status(500).json({ error: 'Erro ao lançar movimentação' });
+  } finally {
+    client.release();
+  }
+});
+
+// Estorna um lançamento incorreto criando um movimento inverso
+app.post('/api/estoque/movimentos/:id/estornar', authenticateToken, async (req, res) => {
+  const movId = parseInt(req.params.id, 10);
+  if (Number.isNaN(movId)) {
+    return res.status(400).json({ error: 'id de movimento inválido' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const movRes = await client.query(
+      `SELECT m.*, p.id AS produto_id_real
+       FROM estoque_movimentos m
+       INNER JOIN estoque_produtos p ON p.id = m.produto_id
+       WHERE m.id = $1
+       FOR UPDATE`,
+      [movId]
+    );
+    if (movRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Movimento não encontrado' });
+    }
+    const mov = movRes.rows[0];
+    const pode = await assertEstoqueAcessoRestaurante(req, res, mov.restaurante_id);
+    if (!pode) {
+      await client.query('ROLLBACK');
+      return;
+    }
+    if (mov.estornado || mov.estornado_por_movimento_id) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Este lançamento já foi estornado.' });
+    }
+    if (mov.tipo === 'estorno') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Não é possível estornar um estorno.' });
+    }
+
+    const prodLock = await client.query('SELECT * FROM estoque_produtos WHERE id = $1 FOR UPDATE', [mov.produto_id]);
+    if (prodLock.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Produto do movimento não encontrado.' });
+    }
+    const prod = prodLock.rows[0];
+    const antes = normalizeQuantidadeInt(prod.quantidade);
+    const difOriginal = parseInt(mov.diferenca, 10) || 0;
+    const deltaInverso = -difOriginal;
+    const depois = antes + deltaInverso;
+    if (depois < 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Não é possível estornar: saldo atual insuficiente.' });
+    }
+    await client.query(
+      'UPDATE estoque_produtos SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [depois, mov.produto_id]
+    );
+    const estornoIns = await client.query(
+      `INSERT INTO estoque_movimentos (
+        produto_id, restaurante_id, usuario_id, quantidade_antes, quantidade_depois, diferenca, tipo, quantidade, observacao, movimento_estorno_de_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'estorno', $7, $8, $9)
+      RETURNING id`,
+      [
+        mov.produto_id,
+        mov.restaurante_id,
+        req.user.id,
+        antes,
+        depois,
+        deltaInverso,
+        Math.abs(deltaInverso),
+        `Estorno do lançamento #${mov.id}`,
+        mov.id
+      ]
+    );
+    const estornoId = estornoIns.rows[0].id;
+    await client.query(
+      `UPDATE estoque_movimentos
+       SET estornado = true, estornado_por_movimento_id = $1
+       WHERE id = $2`,
+      [estornoId, mov.id]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Lançamento estornado com sucesso.', movimento_estorno_id: estornoId });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao estornar movimento:', error);
+    res.status(500).json({ error: 'Erro ao estornar movimento' });
+  } finally {
+    client.release();
+  }
+});
+
 // Resumo entradas/saídas por período (padrão: semana atual, seg–dom)
 app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) => {
   try {
@@ -875,15 +1041,27 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'data_inicio não pode ser maior que data_fim' });
     }
 
+    const produtoId = req.query.produto_id ? parseInt(req.query.produto_id, 10) : null;
+    if (req.query.produto_id && Number.isNaN(produtoId)) {
+      return res.status(400).json({ error: 'produto_id inválido' });
+    }
+
+    let where = `m.restaurante_id = $1
+      AND m.created_at::date >= $2::date
+      AND m.created_at::date <= $3::date`;
+    const paramsBase = [rid, dataInicio, dataFim];
+    if (produtoId) {
+      where += ' AND m.produto_id = $4';
+      paramsBase.push(produtoId);
+    }
+
     const tot = await pool.query(
       `SELECT
-        COALESCE(SUM(CASE WHEN diferenca > 0 THEN diferenca ELSE 0 END), 0)::int AS entradas,
-        COALESCE(SUM(CASE WHEN diferenca < 0 THEN -diferenca ELSE 0 END), 0)::int AS saidas
-       FROM estoque_movimentos
-       WHERE restaurante_id = $1
-         AND created_at::date >= $2::date
-         AND created_at::date <= $3::date`,
-      [rid, dataInicio, dataFim]
+        COALESCE(SUM(CASE WHEN m.diferenca > 0 THEN m.diferenca ELSE 0 END), 0)::int AS entradas,
+        COALESCE(SUM(CASE WHEN m.diferenca < 0 THEN -m.diferenca ELSE 0 END), 0)::int AS saidas
+       FROM estoque_movimentos m
+       WHERE ${where}`,
+      paramsBase
     );
 
     const porProduto = await pool.query(
@@ -892,19 +1070,39 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
         COALESCE(SUM(CASE WHEN m.diferenca < 0 THEN -m.diferenca ELSE 0 END), 0)::int AS saidas
        FROM estoque_movimentos m
        INNER JOIN estoque_produtos p ON p.id = m.produto_id
-       WHERE m.restaurante_id = $1
-         AND m.created_at::date >= $2::date
-         AND m.created_at::date <= $3::date
+       WHERE ${where}
        GROUP BY m.produto_id, p.nome
        ORDER BY p.nome ASC`,
-      [rid, dataInicio, dataFim]
+      paramsBase
+    );
+
+    const saidasPorDia = await pool.query(
+      `SELECT m.created_at::date AS data,
+        COALESCE(SUM(CASE WHEN m.diferenca < 0 THEN -m.diferenca ELSE 0 END), 0)::int AS saidas
+      FROM estoque_movimentos m
+      WHERE ${where}
+      GROUP BY m.created_at::date
+      ORDER BY m.created_at::date ASC`,
+      paramsBase
+    );
+
+    const saldos = await pool.query(
+      `SELECT p.id AS produto_id, p.nome, p.quantidade::int AS saldo_atual
+       FROM estoque_produtos p
+       WHERE p.restaurante_id = $1
+         ${produtoId ? 'AND p.id = $2' : ''}
+       ORDER BY p.nome ASC`,
+      produtoId ? [rid, produtoId] : [rid]
     );
 
     res.json({
       restaurante_id: rid,
       periodo: { data_inicio: dataInicio, data_fim: dataFim },
+      filtro: { produto_id: produtoId || null },
       totais: tot.rows[0],
-      por_produto: porProduto.rows
+      por_produto: porProduto.rows,
+      saidas_por_dia: saidasPorDia.rows,
+      saldos: saldos.rows
     });
   } catch (error) {
     console.error('Erro ao resumir movimentos:', error);
@@ -924,10 +1122,15 @@ app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
 
     const dataInicio = parseDateOnly(req.query.data_inicio);
     const dataFim = parseDateOnly(req.query.data_fim);
+    const produtoId = req.query.produto_id ? parseInt(req.query.produto_id, 10) : null;
+    if (req.query.produto_id && Number.isNaN(produtoId)) {
+      return res.status(400).json({ error: 'produto_id inválido' });
+    }
     const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || 100, 1), 500);
 
     let q = `
       SELECT m.id, m.produto_id, p.nome AS produto_nome, m.quantidade_antes, m.quantidade_depois, m.diferenca,
+        m.tipo, m.quantidade, m.observacao, m.estornado, m.estornado_por_movimento_id, m.movimento_estorno_de_id,
         m.created_at, u.nome AS usuario_nome
       FROM estoque_movimentos m
       INNER JOIN estoque_produtos p ON p.id = m.produto_id
@@ -943,6 +1146,11 @@ app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
     if (dataFim) {
       q += ` AND m.created_at::date <= $${idx}::date`;
       params.push(dataFim);
+      idx += 1;
+    }
+    if (produtoId) {
+      q += ` AND m.produto_id = $${idx}`;
+      params.push(produtoId);
       idx += 1;
     }
     q += ` ORDER BY m.created_at DESC LIMIT $${idx}`;
