@@ -41,8 +41,13 @@ const Login = ({ onLogin }) => {
       onLogin(response.data.user, response.data.token);
     } catch (err) {
       if (err.response?.status === 405) {
+        const apiHealth = `${API_URL}/health`;
+        const rootHealth = String(API_URL).replace(/\/api$/i, '') + '/health';
         setError(
-          'Servidor recusou o login (405). Confira no Easypanel se REACT_APP_API_URL aponta para o serviço Node (API), não para o site estático do front.'
+          `Login em 405: o POST não está chegando ao Express. Mesmo com REACT_APP_API_URL certo, no Easypanel o domínio costuma mandar só GET /health para o Node e mandar /api para o site estático (nginx devolve 405 em POST). ` +
+            `Corrija o roteamento: todo o prefixo /api (GET e POST) deve ir para o container Node na porta 5000 — não para o build do React. ` +
+            `Teste: abra ${apiHealth} — se vier HTML do app em vez de JSON, confirma. Compare com GET ${rootHealth} (JSON do backend). ` +
+            `Alternativa: subdomínio só da API apontando 100% para o Node e REACT_APP_API_URL apontando para ele.`
         );
       } else {
         setError(err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.');

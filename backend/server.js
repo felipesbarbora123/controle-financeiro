@@ -144,6 +144,22 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Uma linha por requisição ao fim da resposta — confirma se o proxy chega no Node (LOG_HTTP=0 desliga)
+if (
+  process.env.NODE_ENV !== 'test' &&
+  process.env.LOG_HTTP !== '0' &&
+  process.env.LOG_HTTP !== 'false'
+) {
+  app.use((req, res, next) => {
+    const t0 = Date.now();
+    res.on('finish', () => {
+      const ms = Date.now() - t0;
+      console.log(`[http] ${req.method} ${req.originalUrl || req.url} -> ${res.statusCode} (${ms}ms)`);
+    });
+    next();
+  });
+}
+
 // Database connection
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
@@ -1364,24 +1380,42 @@ app.delete('/api/admin/usuarios-estoque/:id', authenticateToken, requireAdmin, a
   }
 });
 
-// Health check endpoint para Easypanel
-app.get('/health', async (req, res) => {
+// Health: liveness sem DB (evita 502 por timeout do proxy se o Postgres estiver inacessível)
+function apiHealthLiveness(req, res) {
+  res.status(200).json({
+    status: 'ok',
+    check: 'liveness',
+    service: 'controle-financeiro-api',
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+    hint: 'GET /api/health/ready para testar conexão com o banco.'
+  });
+}
+
+// Readiness: inclui SELECT 1 no Postgres
+async function healthWithDatabase(req, res) {
   try {
-    // Testar conexão com banco
     await pool.query('SELECT 1');
-    res.status(200).json({ 
-      status: 'ok', 
+    res.status(200).json({
+      status: 'ok',
+      check: 'ready',
       database: 'connected',
-      timestamp: new Date().toISOString() 
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(503).json({ 
-      status: 'error', 
+    res.status(503).json({
+      status: 'error',
+      check: 'ready',
       database: 'disconnected',
-      error: error.message 
+      error: error.message
     });
   }
-});
+}
+
+app.get('/api/health', apiHealthLiveness);
+app.get('/api/health/ready', healthWithDatabase);
+// Easypanel / probes antigos: mantém checagem com banco na raiz
+app.get('/health', healthWithDatabase);
 
 module.exports = app;
 
@@ -1389,6 +1423,10 @@ module.exports = app;
 if (require.main === module) {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORT}`);
+    console.log('[boot] GET /api/health (liveness) | GET /api/health/ready (Postgres) | POST /api/login');
+    if (process.env.LOG_HTTP !== '0' && process.env.LOG_HTTP !== 'false') {
+      console.log('[boot] Log de cada requisição HTTP ativo — defina LOG_HTTP=0 para desligar');
+    }
   });
 
   process.on('SIGTERM', () => {
