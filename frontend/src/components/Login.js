@@ -14,11 +14,24 @@ const Login = ({ onLogin }) => {
     setError('');
     setLoading(true);
 
+    const body = { username, password };
+    const primaryUrl = `${API_URL}/login`;
+
+    const postLogin = async (url) => axios.post(url, body);
+
     try {
-      const response = await axios.post(`${API_URL}/login`, {
-        username,
-        password
-      });
+      let response;
+      try {
+        response = await postLogin(primaryUrl);
+      } catch (firstErr) {
+        const st = firstErr.response?.status;
+        const altBase = String(API_URL).replace(/\/api$/i, '');
+        if (st === 405 && altBase && altBase !== API_URL) {
+          response = await postLogin(`${altBase}/login`);
+        } else {
+          throw firstErr;
+        }
+      }
 
       // Salvar token no localStorage
       localStorage.setItem('token', response.data.token);
@@ -27,7 +40,13 @@ const Login = ({ onLogin }) => {
       // Notificar componente pai
       onLogin(response.data.user, response.data.token);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.');
+      if (err.response?.status === 405) {
+        setError(
+          'Servidor recusou o login (405). Confira no Easypanel se REACT_APP_API_URL aponta para o serviço Node (API), não para o site estático do front.'
+        );
+      } else {
+        setError(err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.');
+      }
     } finally {
       setLoading(false);
     }
@@ -47,6 +66,8 @@ const Login = ({ onLogin }) => {
             <input
               type="text"
               id="username"
+              name="username"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Digite seu usuário"
@@ -61,6 +82,8 @@ const Login = ({ onLogin }) => {
             <input
               type="password"
               id="password"
+              name="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Digite sua senha"

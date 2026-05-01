@@ -170,9 +170,8 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// Auth Routes
-// Login
-app.post('/api/login', async (req, res) => {
+// Auth Routes — login em /api/login e /login (proxy que remove o prefixo /api)
+async function loginHandler(req, res) {
   try {
     console.log('Tentativa de login recebida');
     const { username, password } = req.body;
@@ -194,7 +193,7 @@ app.post('/api/login', async (req, res) => {
 
     const user = result.rows[0];
     console.log('Usuário encontrado, verificando senha...');
-    
+
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
@@ -239,12 +238,15 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Erro no login:', error);
     console.error('Stack trace:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao fazer login',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+}
+
+app.post('/api/login', loginHandler);
+app.post('/login', loginHandler);
 
 // Verify token
 app.get('/api/verify', authenticateToken, async (req, res) => {

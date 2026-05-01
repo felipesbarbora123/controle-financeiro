@@ -1,9 +1,14 @@
 // Configuração dinâmica da URL da API
 // Detecta automaticamente se está rodando em localhost ou em rede local
+
+function trimTrailingSlashes(url) {
+  return String(url || '').replace(/\/+$/, '');
+}
+
 const getApiUrl = () => {
-  // Se está definido nas variáveis de ambiente, usa
+  // Se está definido nas variáveis de ambiente, usa (sem barra final: evita .../api//login)
   if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
+    return trimTrailingSlashes(process.env.REACT_APP_API_URL);
   }
   
   // Se está acessando de outro dispositivo (não localhost)
@@ -24,4 +29,4 @@ const getApiUrl = () => {
   return 'http://localhost:5000/api';
 };
 
-export const API_URL = getApiUrl();
+export const API_URL = trimTrailingSlashes(getApiUrl());
