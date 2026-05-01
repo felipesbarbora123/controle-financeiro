@@ -13,6 +13,7 @@
 - **Relatório**: `GET /api/estoque/movimentos/resumo` — totais e por produto no período (padrão: semana corrente, segunda–domingo). `GET /api/estoque/movimentos` — últimos lançamentos (auditoria).
 - Migração **`008_estoque_movimentos.sql`**: tabela `estoque_movimentos`.
 - Migração **`009_estoque_movimentos_operacao_estorno.sql`**: campos de tipo/quantidade/observação e estorno.
+- Migração **`010_estoque_movimentos_trigger_defaults.sql`**: trigger que preenche `tipo`/`quantidade` em INSERTs sem essas colunas (evita erro 500 se o deploy do backend ficar atrás da migração 009).
 - **Perfil estoque** (`usuarios.somente_estoque = true`): vê **apenas** o módulo Estoque no app; rotas `/api/gastos*` retornam **403**; **POST/PUT/DELETE** em `/api/restaurantes` também retornam **403** (apenas **GET** para escolher o restaurante no seletor).
 - **Restaurantes por usuário de estoque**: a tabela `usuario_restaurante_estoque` define em quais restaurantes cada usuário `somente_estoque` pode **ver e lançar** estoque. Fora dessa lista, **GET** `/api/restaurantes`, **GET** `/api/estoque/agrupado` e **PUT** de quantidade em produto retornam **403**.
 - **Administrador**: no app, aba **Usuários estoque** — criar/editar/excluir usuários `somente_estoque` e marcar os restaurantes de cada um.

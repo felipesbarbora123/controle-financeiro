@@ -1095,14 +1095,18 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
       produtoId ? [rid, produtoId] : [rid]
     );
 
+    const rowTotais = tot.rows[0] || {};
     res.json({
       restaurante_id: rid,
       periodo: { data_inicio: dataInicio, data_fim: dataFim },
       filtro: { produto_id: produtoId || null },
-      totais: tot.rows[0],
-      por_produto: porProduto.rows,
-      saidas_por_dia: saidasPorDia.rows,
-      saldos: saldos.rows
+      totais: {
+        entradas: Number(rowTotais.entradas) || 0,
+        saidas: Number(rowTotais.saidas) || 0
+      },
+      por_produto: Array.isArray(porProduto.rows) ? porProduto.rows : [],
+      saidas_por_dia: Array.isArray(saidasPorDia.rows) ? saidasPorDia.rows : [],
+      saldos: Array.isArray(saldos.rows) ? saldos.rows : []
     });
   } catch (error) {
     console.error('Erro ao resumir movimentos:', error);
@@ -1157,7 +1161,7 @@ app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
     params.push(limite);
 
     const result = await pool.query(q, params);
-    res.json({ restaurante_id: rid, movimentos: result.rows });
+    res.json({ restaurante_id: rid, movimentos: Array.isArray(result.rows) ? result.rows : [] });
   } catch (error) {
     console.error('Erro ao listar movimentos:', error);
     res.status(500).json({ error: 'Erro ao listar movimentos' });

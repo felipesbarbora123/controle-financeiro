@@ -87,12 +87,21 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
 
         const [rRes, lRes] = await Promise.all([
           axios.get<ResumoMovimentosResponse>(`${API_URL}/estoque/movimentos/resumo`, { params: paramsResumo }),
-          axios.get<{ movimentos: MovimentoRow[] }>(`${API_URL}/estoque/movimentos`, { params: paramsLista })
+          axios.get<{ movimentos?: MovimentoRow[] }>(`${API_URL}/estoque/movimentos`, { params: paramsLista })
         ]);
-        setResumo(rRes.data);
-        setLista(lRes.data.movimentos || []);
-        setDataInicio(rRes.data.periodo.data_inicio);
-        setDataFim(rRes.data.periodo.data_fim);
+        const raw = rRes.data;
+        const periodo = raw.periodo ?? { data_inicio: '', data_fim: '' };
+        setResumo({
+          ...raw,
+          periodo,
+          totais: raw.totais ?? { entradas: 0, saidas: 0 },
+          por_produto: raw.por_produto ?? [],
+          saidas_por_dia: raw.saidas_por_dia ?? [],
+          saldos: raw.saldos ?? []
+        });
+        setLista(lRes.data?.movimentos ?? []);
+        setDataInicio(periodo.data_inicio);
+        setDataFim(periodo.data_fim);
       } catch (e) {
         console.error(e);
         onMessageRef.current?.('Não foi possível carregar a movimentação.');
