@@ -12,11 +12,9 @@ const getApiUrl = () => {
   
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     // Usa o mesmo protocolo da página (HTTPS em produção)
-    // Se o backend está no mesmo domínio mas porta diferente, ajuste aqui
-    // Por padrão, usa o domínio do backend no Easypanel
     if (hostname.includes('easypanel.host')) {
-      // Produção: usa o domínio do backend com HTTPS
-      return `https://multi-app-financialmanagementapp.dtun51.easypanel.host/api`;
+      // Mesmo host da página (homolog/prod cada um no seu domínio). Se a API for outro host, defina REACT_APP_API_URL no build.
+      return `${protocol}//${hostname}/api`;
     }
     // Fallback: usa o protocolo atual da página
     return `${protocol}//${hostname}:5000/api`;

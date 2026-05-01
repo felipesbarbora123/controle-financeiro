@@ -949,3 +949,86 @@
 .estoque-movimentacao-li-delta:first-of-type {
   color: inherit;
 }
+
+.estoque-modulo.estoque-movimentacao {
+  max-width: 42rem;
+}
+
+.estoque-lancamento-rapido {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.estoque-lancamento-rapido .estoque-subsection-title {
+  margin-top: 0;
+}
+
+.estoque-lancamento-rapido-saldo {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.estoque-lancamento-rapido-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 520px) {
+  .estoque-lancamento-rapido-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.estoque-lancamento-rapido-span-obs {
+  grid-column: 1 / -1;
+}
+
+.estoque-lancamento-rapido-acao {
+  grid-column: 1 / -1;
+}
+
+.estoque-input--full {
+  max-width: none;
+  width: 100%;
+}
+
+.estoque-input--filtro-prod {
+  max-width: none;
+  min-width: min(100%, 14rem);
+}
+
+.estoque-qtd-com-presets {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+}
+
+.estoque-qtd-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.estoque-qtd-preset-btn {
+  min-height: 36px;
+  min-width: 40px;
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estoque-qtd-preset-btn:active {
+  background: #e2e8f0;
+}

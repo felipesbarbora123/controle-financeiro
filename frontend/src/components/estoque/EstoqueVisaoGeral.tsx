@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
+import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
 import { IconSave, IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
@@ -147,11 +148,11 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
     }
     onMessage?.(null);
     try {
-      await axios.post(`${API_URL}/estoque/produtos/${produto.id}/movimentar`, {
-        tipo,
-        quantidade: q,
-        observacao: (observacao || '').trim()
-      });
+      await movimentarProduto(
+        produto.id,
+        { tipo, quantidade: q, observacao: (observacao || '').trim() },
+        Number(produto.quantidade)
+      );
       await onReload();
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -203,14 +204,14 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {modoOperador && (
         <p className="estoque-operador-ajuda">
-          Itens agrupados por <strong>categoria</strong>. A <strong>quantidade</strong> é sempre inteira. O restaurante é o
-          selecionado no topo — você só vê as <strong>lojas</strong> liberadas pelo administrador.
+          Por <strong>categoria</strong>: escolha <strong>saída</strong> ou <strong>entrada</strong>, a quantidade (inteira) e
+          confirme. Restaurante no topo da tela.
         </p>
       )}
 
       {!modoOperador && isAdmin && (
         <p className="estoque-admin-visao-hint">
-          Lançamentos por entrada/saída. Item sem atualização há mais de 1 dia fica amarelo; mais de 2 dias, vermelho.
+          Entrada / saída com o valor do ajuste. Sem atualização há mais de 1 dia (amarelo) ou 2 (vermelho).
         </p>
       )}
 
@@ -286,6 +287,10 @@ const MovimentoEditor: React.FC<QEProps> = ({ produto, onSave }) => {
     setVal(onlyDigits === '' ? '' : onlyDigits);
   }, []);
 
+  const setPreset = useCallback((n: number) => {
+    setVal(String(n));
+  }, []);
+
   const doSave = useCallback(() => {
     onSave(produto, tipo, val, observacao);
     setVal('1');
@@ -303,16 +308,30 @@ const MovimentoEditor: React.FC<QEProps> = ({ produto, onSave }) => {
         <option value="saida">Saída</option>
         <option value="entrada">Entrada</option>
       </select>
-      <input
-        id={`qtd-${produto.id}`}
-        className="estoque-input estoque-input-qtd estoque-input-qtd--int"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        autoComplete="off"
-        value={val}
-        onChange={onInputChange}
-        aria-label={`Quantidade do lançamento para ${produto.nome}`}
-      />
+      <div className="estoque-qtd-com-presets">
+        <input
+          id={`qtd-${produto.id}`}
+          className="estoque-input estoque-input-qtd estoque-input-qtd--int"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="off"
+          value={val}
+          onChange={onInputChange}
+          aria-label={`Quantidade do lançamento para ${produto.nome}`}
+        />
+        <div className="estoque-qtd-presets" role="group" aria-label="Quantidades rápidas">
+          {[1, 5, 10].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className="estoque-qtd-preset-btn"
+              onClick={() => setPreset(n)}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
       <input
         className="estoque-input estoque-input--mov-obs"
         value={observacao}

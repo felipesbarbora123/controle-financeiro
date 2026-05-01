@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueAgrupadoResponse, EstoqueCategoria, EstoqueView } from './estoqueTypes';
@@ -7,6 +7,21 @@ import EstoqueCategorias from './EstoqueCategorias';
 import EstoqueProdutos from './EstoqueProdutos';
 import EstoqueMovimentacao from './EstoqueMovimentacao';
 import '../Estoque.css';
+
+function catalogoParaMovimentacao(cats: EstoqueCategoria[]) {
+  const out: { id: number; nome: string; quantidade: number }[] = [];
+  cats.forEach((c) => {
+    (c.produtos || []).forEach((p) => {
+      out.push({
+        id: p.id,
+        nome: p.nome,
+        quantidade: Math.max(0, Math.round(Number(p.quantidade)) || 0)
+      });
+    });
+  });
+  out.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+  return out;
+}
 
 interface Props {
   restauranteId: number | null;
@@ -27,6 +42,7 @@ const EstoqueShell: React.FC<Props> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<EstoqueCategoria[]>([]);
+  const catalogoMovimentacao = useMemo(() => catalogoParaMovimentacao(categorias), [categorias]);
 
   const carregar = useCallback(async () => {
     if (!restauranteId) {
@@ -111,6 +127,8 @@ const EstoqueShell: React.FC<Props> = ({
             restauranteId={restauranteId}
             onMessage={onMessage}
             periodoPreset={movimentoPeriodoPreset}
+            produtosCatalogo={catalogoMovimentacao}
+            onLancamentoFeito={carregar}
           />
         )}
         {effectiveView === 'categorias' && isAdmin && (

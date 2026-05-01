@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
+import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import '../Estoque.css';
 
 export interface ResumoMovimentosResponse {
@@ -30,10 +31,18 @@ interface MovimentoRow {
   usuario_nome: string | null;
 }
 
+export interface EstoqueCatalogoItem {
+  id: number;
+  nome: string;
+  quantidade: number;
+}
+
 interface Props {
   restauranteId: number;
   onMessage?: (msg: string | null) => void;
   periodoPreset?: { data_inicio: string; data_fim: string; token: number } | null;
+  produtosCatalogo?: EstoqueCatalogoItem[];
+  onLancamentoFeito?: () => void | Promise<void>;
 }
 
 function addDays(isoDate: string, days: number): string {
@@ -53,9 +62,17 @@ function formatarDataHora(iso: string): string {
   }
 }
 
-const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, periodoPreset }) => {
+const EstoqueMovimentacao: React.FC<Props> = ({
+  restauranteId,
+  onMessage,
+  periodoPreset,
+  produtosCatalogo = [],
+  onLancamentoFeito
+}) => {
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const onLancamentoFeitoRef = useRef(onLancamentoFeito);
+  onLancamentoFeitoRef.current = onLancamentoFeito;
 
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -63,6 +80,41 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
   const [lista, setLista] = useState<MovimentoRow[]>([]);
   const [produtoId, setProdutoId] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const [lancProdId, setLancProdId] = useState('');
+  const [lancTipo, setLancTipo] = useState<'entrada' | 'saida'>('saida');
+  const [lancQtd, setLancQtd] = useState('1');
+  const [lancObs, setLancObs] = useState('');
+  const [lancSaving, setLancSaving] = useState(false);
+
+  const opcoesProdutoFiltro = useMemo(() => {
+    const map = new Map<number, string>();
+    produtosCatalogo.forEach((p) => map.set(p.id, p.nome));
+    (resumo?.saldos || []).forEach((s) => map.set(s.produto_id, s.nome));
+    return Array.from(map.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+  }, [produtosCatalogo, resumo?.saldos]);
+
+  const saldoLancamentoRapido = useMemo(() => {
+    const id = parseInt(lancProdId, 10);
+    if (Number.isNaN(id)) return 0;
+    const cat = produtosCatalogo.find((p) => p.id === id);
+    if (cat !== undefined) return cat.quantidade;
+    const s = resumo?.saldos?.find((x) => x.produto_id === id);
+    return s?.saldo_atual ?? 0;
+  }, [lancProdId, produtosCatalogo, resumo?.saldos]);
+
+  useEffect(() => {
+    setLancProdId('');
+    setLancQtd('1');
+    setLancObs('');
+  }, [restauranteId]);
+
+  useEffect(() => {
+    if (lancProdId !== '' || produtosCatalogo.length === 0) return;
+    setLancProdId(String(produtosCatalogo[0].id));
+  }, [produtosCatalogo, lancProdId]);
 
   const carregar = useCallback(
     async (inicio?: string, fim?: string) => {
@@ -130,12 +182,49 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
     carregar(dataInicio, dataFim);
   };
 
+  const recarregarPeriodoAtual = useCallback(async () => {
+    if (dataInicio && dataFim) await carregar(dataInicio, dataFim);
+    else await carregar();
+  }, [carregar, dataInicio, dataFim]);
+
+  const lancarRapido = async () => {
+    const id = parseInt(lancProdId, 10);
+    if (Number.isNaN(id) || id <= 0) {
+      onMessageRef.current?.('Escolha um produto.');
+      return;
+    }
+    const q = parseInt(String(lancQtd).replace(/\D/g, ''), 10);
+    if (!q || q <= 0) {
+      onMessageRef.current?.('Informe quantidade inteira maior que zero.');
+      return;
+    }
+    setLancSaving(true);
+    onMessageRef.current?.(null);
+    try {
+      await movimentarProduto(
+        id,
+        { tipo: lancTipo, quantidade: q, observacao: lancObs.trim() },
+        saldoLancamentoRapido
+      );
+      await recarregarPeriodoAtual();
+      await onLancamentoFeitoRef.current?.();
+      onMessageRef.current?.('Lançamento registrado.');
+      setLancQtd('1');
+      setLancObs('');
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { error?: string } } };
+      onMessageRef.current?.(ax.response?.data?.error || 'Erro ao lançar.');
+    } finally {
+      setLancSaving(false);
+    }
+  };
+
   const estornarMovimento = async (id: number) => {
     if (!window.confirm('Estornar este lançamento incorreto?')) return;
     onMessageRef.current?.(null);
     try {
       await axios.post(`${API_URL}/estoque/movimentos/${id}/estornar`);
-      await carregar(dataInicio, dataFim);
+      await recarregarPeriodoAtual();
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { error?: string } } };
       onMessageRef.current?.(ax.response?.data?.error || 'Não foi possível estornar o lançamento.');
@@ -164,15 +253,80 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
     <div className="estoque-modulo estoque-modulo--screen estoque-movimentacao">
       <div className="estoque-toolbar estoque-toolbar--with-title">
         <h2 className="estoque-screen-title">Movimentação</h2>
-        <button type="button" className="estoque-btn-refresh" onClick={() => carregar(dataInicio, dataFim)}>
+        <button type="button" className="estoque-btn-refresh" onClick={() => recarregarPeriodoAtual()}>
           Atualizar
         </button>
       </div>
 
       <p className="estoque-movimentacao-intro">
-        Entradas e saídas são calculadas pela diferença entre o valor anterior e o novo em cada lançamento (ex.: 10 → 8 =
-        2 saídas; 8 → 10 = 2 entradas).
+        Relatório por período abaixo. Para <strong>lançar</strong> entrada ou saída use o bloco rápido ou a aba{' '}
+        <strong>{'Itens / Lançar estoque'}</strong>.
       </p>
+
+      {produtosCatalogo.length > 0 && (
+        <section className="estoque-lancamento-rapido" aria-label="Lançamento rápido">
+          <h3 className="estoque-subsection-title">Lançamento rápido</h3>
+          <p className="estoque-lancamento-rapido-saldo">
+            Saldo atual do item selecionado: <strong>{saldoLancamentoRapido}</strong>
+          </p>
+          <div className="estoque-lancamento-rapido-grid">
+            <label className="estoque-movimentacao-label">
+              Produto
+              <select
+                className="estoque-input estoque-input--date estoque-input--full"
+                value={lancProdId}
+                onChange={(e) => setLancProdId(e.target.value)}
+              >
+                {produtosCatalogo.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="estoque-movimentacao-label">
+              Tipo
+              <select
+                className="estoque-input estoque-input--date estoque-input--full"
+                value={lancTipo}
+                onChange={(e) => setLancTipo(e.target.value === 'entrada' ? 'entrada' : 'saida')}
+              >
+                <option value="saida">Saída</option>
+                <option value="entrada">Entrada</option>
+              </select>
+            </label>
+            <label className="estoque-movimentacao-label">
+              Quantidade
+              <input
+                className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-input--full"
+                inputMode="numeric"
+                autoComplete="off"
+                value={lancQtd}
+                onChange={(e) => setLancQtd(e.target.value.replace(/\D/g, '') || '')}
+              />
+            </label>
+            <label className="estoque-movimentacao-label estoque-lancamento-rapido-span-obs">
+              Observação (opcional)
+              <input
+                className="estoque-input estoque-input--full"
+                value={lancObs}
+                onChange={(e) => setLancObs(e.target.value)}
+                placeholder="Ex.: compra, perda…"
+              />
+            </label>
+            <div className="estoque-lancamento-rapido-acao">
+              <button
+                type="button"
+                className="estoque-btn-primary estoque-btn-block"
+                disabled={lancSaving}
+                onClick={lancarRapido}
+              >
+                {lancSaving ? 'Salvando…' : 'Confirmar lançamento'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="estoque-movimentacao-filtros" aria-label="Período">
         <div className="estoque-movimentacao-datas">
@@ -200,13 +354,13 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
           <label className="estoque-movimentacao-label">
             Produto
             <select
-              className="estoque-input estoque-input--date"
+              className="estoque-input estoque-input--date estoque-input--filtro-prod"
               value={produtoId}
               onChange={(e) => setProdutoId(e.target.value)}
             >
-              <option value="">Todos</option>
-              {(resumo?.saldos || []).map((p) => (
-                <option key={p.produto_id} value={String(p.produto_id)}>
+              <option value="">Todos os produtos</option>
+              {opcoesProdutoFiltro.map((p) => (
+                <option key={p.id} value={String(p.id)}>
                   {p.nome}
                 </option>
               ))}
@@ -227,7 +381,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
       </section>
 
       {loading ? (
-        <p className="estoque-empty-msg">Carregando…</p>
+        <p className="estoque-empty-msg">Carregando relatório do período…</p>
       ) : resumo ? (
         <>
           <section className="estoque-movimentacao-resumo" aria-label="Totais do período">
@@ -327,7 +481,12 @@ const EstoqueMovimentacao: React.FC<Props> = ({ restauranteId, onMessage, period
             )}
           </section>
         </>
-      ) : null}
+      ) : (
+        <p className="estoque-empty-msg">
+          Não foi possível carregar o resumo deste período. Ajuste as datas ou use Atualizar. O lançamento rápido acima
+          continua disponível.
+        </p>
+      )}
     </div>
   );
 };
