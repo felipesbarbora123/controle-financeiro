@@ -15,23 +15,10 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     const body = { username, password };
-    const primaryUrl = `${API_URL}/login`;
-
-    const postLogin = async (url) => axios.post(url, body);
+    const loginUrl = `${API_URL}/login`;
 
     try {
-      let response;
-      try {
-        response = await postLogin(primaryUrl);
-      } catch (firstErr) {
-        const st = firstErr.response?.status;
-        const altBase = String(API_URL).replace(/\/api$/i, '');
-        if (st === 405 && altBase && altBase !== API_URL) {
-          response = await postLogin(`${altBase}/login`);
-        } else {
-          throw firstErr;
-        }
-      }
+      const response = await axios.post(loginUrl, body);
 
       // Salvar token no localStorage
       localStorage.setItem('token', response.data.token);
@@ -44,10 +31,9 @@ const Login = ({ onLogin }) => {
         const apiHealth = `${API_URL}/health`;
         const rootHealth = String(API_URL).replace(/\/api$/i, '') + '/health';
         setError(
-          `Login em 405: o POST não está chegando ao Express. Mesmo com REACT_APP_API_URL certo, no Easypanel o domínio costuma mandar só GET /health para o Node e mandar /api para o site estático (nginx devolve 405 em POST). ` +
-            `Corrija o roteamento: todo o prefixo /api (GET e POST) deve ir para o container Node na porta 5000 — não para o build do React. ` +
-            `Teste: abra ${apiHealth} — se vier HTML do app em vez de JSON, confirma. Compare com GET ${rootHealth} (JSON do backend). ` +
-            `Alternativa: subdomínio só da API apontando 100% para o Node e REACT_APP_API_URL apontando para ele.`
+          `Login 405: o servidor recusou POST em ${loginUrl}. ` +
+            `Neste build a base da API é: ${API_URL}. Se não for exatamente …financialmanagementapphomolog…/api, faça novo build do front com REACT_APP_API_URL definido (variável só vale na hora do npm run build). ` +
+            `Se a base estiver certa, no Easypanel encaminhe POST /api/* ao Node :5000. Teste JSON: ${apiHealth} e ${rootHealth}.`
         );
       } else {
         setError(err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.');
