@@ -492,6 +492,42 @@
   font-weight: 500;
 }
 
+.estoque-produto-saldo-atual {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.estoque-produto-saldo-atual strong {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.estoque-movimento-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex: 0 1 auto;
+}
+
+.estoque-movimento-preview-linha {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: right;
+  line-height: 1.25;
+  max-width: min(100%, 22rem);
+}
+
+.estoque-movimento-preview-linha strong {
+  color: #0f172a;
+}
+
+.estoque-movimento-preview-linha--erro {
+  color: #b91c1c;
+}
+
 .estoque-admin-linha-acoes {
   display: flex;
   flex-wrap: wrap;

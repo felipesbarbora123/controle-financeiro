@@ -259,7 +259,8 @@ const EstoqueMovimentacao: React.FC<Props> = ({
       </div>
 
       <p className="estoque-movimentacao-intro">
-        Relatório por período abaixo. Para <strong>lançar</strong> entrada ou saída use o bloco rápido ou a aba{' '}
+        Relatório por período abaixo. Para <strong>lançar</strong>: informe quantos itens <strong>entram</strong> (somam ao saldo) ou{' '}
+        <strong>saem</strong> (subtraem) — não é o saldo final desejado. Use o bloco rápido ou a aba{' '}
         <strong>{'Itens / Lançar estoque'}</strong>.
       </p>
 
@@ -296,13 +297,14 @@ const EstoqueMovimentacao: React.FC<Props> = ({
               </select>
             </label>
             <label className="estoque-movimentacao-label">
-              Quantidade
+              Quantidade (entrada soma · saída subtrai)
               <input
                 className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-input--full"
                 inputMode="numeric"
                 autoComplete="off"
                 value={lancQtd}
                 onChange={(e) => setLancQtd(e.target.value.replace(/\D/g, '') || '')}
+                title="Não digite o total em estoque; digite só o que entra ou sai neste lançamento."
               />
             </label>
             <label className="estoque-movimentacao-label estoque-lancamento-rapido-span-obs">
