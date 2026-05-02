@@ -3,7 +3,7 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
-import { IconSave, IconTrash } from './EstoqueIcons';
+import { IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
 
 interface Props {
@@ -68,7 +68,7 @@ interface LinhaProps {
     tipo: 'entrada' | 'saida',
     valorTexto: string,
     observacao: string
-  ) => void | Promise<void>;
+  ) => Promise<void>;
   isAdmin: boolean;
   excluirProduto: (id: number) => void | Promise<void>;
 }
@@ -87,42 +87,42 @@ function saldoInteiroProduto(p: EstoqueProduto): number {
   return Math.max(0, Math.round(Number(p.quantidade)) || 0);
 }
 
-const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAdmin, excluirProduto }) => {
-  const saldo = saldoInteiroProduto(produto);
-  return (
-  <li className={`estoque-produto estoque-produto--admin-linha ${classeAtualizacao(produto.updated_at)}`.trim()}>
-    <div className="estoque-admin-linha-conteudo">
-      <div className="estoque-produto-info estoque-produto-info--simples">
-        <span className="estoque-produto-nome">{produto.nome}</span>
-        <span className="estoque-produto-desc-inline">
-          <span className="estoque-produto-desc-label">Descrição</span>
-          <span className="estoque-produto-un">{produto.unidade || '—'}</span>
-        </span>
-        <span className="estoque-produto-saldo-atual" title="Quantidade atual no estoque antes deste lançamento">
-          Saldo atual: <strong>{saldo}</strong>
-        </span>
-        <span className="estoque-produto-atualizado" title="Última alteração da quantidade ou cadastro">
-          Atual.: {formatAtualizacao(produto.updated_at)}
-        </span>
+const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAdmin, excluirProduto }) => (
+  <li className={`estoque-item-card estoque-produto--admin-linha ${classeAtualizacao(produto.updated_at)}`.trim()}>
+    <div className="estoque-item-card-top">
+      <div className="estoque-item-card-identidade">
+        <h3 className="estoque-item-card-nome">{produto.nome}</h3>
+        <p className="estoque-item-card-meta">
+          <span className="estoque-item-card-meta-label">Como contar / unidade</span>{' '}
+          <span className="estoque-item-card-meta-valor">{produto.unidade?.trim() || '—'}</span>
+          <span className="estoque-item-card-meta-sep" aria-hidden="true">
+            {' · '}
+          </span>
+          <span className="estoque-item-card-meta-label">Última alteração</span>{' '}
+          <span className="estoque-item-card-meta-valor">{formatAtualizacao(produto.updated_at)}</span>
+        </p>
       </div>
-      <div className="estoque-admin-linha-acoes">
-        <MovimentoEditor produto={produto} onSave={salvarMovimento} />
-        {isAdmin && (
-          <button
-            type="button"
-            className="estoque-btn-icon estoque-btn-icon--danger"
-            title="Excluir item"
-            aria-label={`Excluir ${produto.nome}`}
-            onClick={() => excluirProduto(produto.id)}
-          >
-            <IconTrash width={20} height={20} />
-          </button>
-        )}
-      </div>
+      {isAdmin && (
+        <button
+          type="button"
+          className="estoque-btn-icon estoque-btn-icon--danger estoque-item-card-excluir"
+          title="Excluir item"
+          aria-label={`Excluir ${produto.nome}`}
+          onClick={() => excluirProduto(produto.id)}
+        >
+          <IconTrash width={20} height={20} />
+        </button>
+      )}
     </div>
+
+    <div className="estoque-item-card-saldo-destaque" aria-live="polite">
+      <span className="estoque-item-card-saldo-rotulo">Quantidade em estoque agora</span>
+      <span className="estoque-item-card-saldo-numero">{saldoInteiroProduto(produto)}</span>
+    </div>
+
+    <MovimentoEditorEntradaSaida produto={produto} onSave={salvarMovimento} />
   </li>
-  );
-};
+);
 
 const EstoqueVisaoGeral: React.FC<Props> = ({
   categorias,
@@ -149,12 +149,12 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
     const s = String(valorTexto).trim();
     if (s === '' || !/^\d+$/.test(s)) {
       onMessage?.('Informe uma quantidade inteira (sem decimais).');
-      return;
+      throw new Error('VALIDACAO');
     }
     const q = parseInt(s, 10);
     if (q <= 0) {
       onMessage?.('Quantidade deve ser maior que zero.');
-      return;
+      throw new Error('VALIDACAO');
     }
     onMessage?.(null);
     try {
@@ -167,6 +167,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       onMessage?.(ax.response?.data?.error || 'Erro ao salvar quantidade.');
+      throw err;
     }
   };
 
@@ -204,7 +205,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
   );
 
   return (
-    <div className="estoque-modulo estoque-modulo--screen">
+    <div className="estoque-modulo estoque-modulo--screen estoque-modulo--lista-itens">
       <div className="estoque-toolbar estoque-toolbar--with-title">
         <h2 className="estoque-screen-title">{tituloTela}</h2>
         <button type="button" className="estoque-btn-refresh" onClick={() => onReload()}>
@@ -214,15 +215,15 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
       {modoOperador && (
         <p className="estoque-operador-ajuda">
-          Por <strong>categoria</strong>: escolha <strong>entrada</strong> (soma ao saldo) ou <strong>saída</strong> (subtrai),
-          informe <strong>quantos itens</strong> entram ou saem (não é o total desejado) e confirme. Restaurante no topo da tela.
+          Use <strong>Registrar entrada</strong> para o que chegou (soma ao número em estoque) e <strong>Registrar saída</strong> para o
+          que saiu (subtrai). O número digitado não é o total final — só o deste lançamento. Confira o restaurante no topo da tela.
         </p>
       )}
 
       {!modoOperador && isAdmin && (
         <p className="estoque-admin-visao-hint">
-          A quantidade do lançamento é o que <strong>entra ou sai</strong> (ex.: saldo 1 + entrada 10 = 11). Itens sem atualização
-          há mais de 1 dia (amarelo) ou 2 (vermelho).
+          Cada cartão mostra o <strong>estoque atual</strong> e dois blocos: entrada (soma) e saída (subtrai). Itens sem atualização há
+          mais de 1 dia (fundo amarelo) ou 2 (fundo rosado).
         </p>
       )}
 
@@ -285,110 +286,168 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
 
 interface QEProps {
   produto: EstoqueProduto;
-  onSave: (p: EstoqueProduto, tipo: 'entrada' | 'saida', v: string, observacao: string) => void;
+  onSave: (p: EstoqueProduto, tipo: 'entrada' | 'saida', v: string, observacao: string) => Promise<void>;
 }
 
-const MovimentoEditor: React.FC<QEProps> = ({ produto, onSave }) => {
-  const [val, setVal] = useState('1');
-  const [tipo, setTipo] = useState<'entrada' | 'saida'>('saida');
+function digitsOnly(v: string): string {
+  const d = v.replace(/\D/g, '');
+  return d === '' ? '' : d;
+}
+
+const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => {
+  const [qEntrada, setQEntrada] = useState('1');
+  const [qSaida, setQSaida] = useState('1');
   const [observacao, setObservacao] = useState('');
   const saldoAtual = useMemo(() => saldoInteiroProduto(produto), [produto.quantidade]);
-  const previewDepois = useMemo(() => {
-    const s = String(val).trim();
+
+  const previewEntrada = useMemo(() => {
+    const s = String(qEntrada).trim();
     if (!/^\d+$/.test(s)) return null;
     const q = parseInt(s, 10);
     if (q <= 0) return null;
-    const depois = tipo === 'entrada' ? saldoAtual + q : saldoAtual - q;
-    return { depois, saidaExcede: depois < 0 };
-  }, [val, tipo, saldoAtual]);
+    return saldoAtual + q;
+  }, [qEntrada, saldoAtual]);
 
-  const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const onlyDigits = e.target.value.replace(/\D/g, '');
-    setVal(onlyDigits === '' ? '' : onlyDigits);
-  }, []);
+  const previewSaida = useMemo(() => {
+    const s = String(qSaida).trim();
+    if (!/^\d+$/.test(s)) return null;
+    const q = parseInt(s, 10);
+    if (q <= 0) return null;
+    const depois = saldoAtual - q;
+    return { depois, erro: depois < 0 };
+  }, [qSaida, saldoAtual]);
 
-  const setPreset = useCallback((n: number) => {
-    setVal(String(n));
-  }, []);
+  const setPresetEntrada = useCallback((n: number) => setQEntrada(String(n)), []);
+  const setPresetSaida = useCallback((n: number) => setQSaida(String(n)), []);
 
-  const doSave = useCallback(() => {
-    onSave(produto, tipo, val, observacao);
-    setVal('1');
-    setObservacao('');
-  }, [onSave, produto, tipo, val, observacao]);
+  const registrarEntrada = useCallback(async () => {
+    try {
+      await onSave(produto, 'entrada', qEntrada, observacao);
+      setQEntrada('1');
+      setObservacao('');
+    } catch {
+      /* validação ou API: mensagem já exibida pelo pai */
+    }
+  }, [onSave, produto, qEntrada, observacao]);
+
+  const registrarSaida = useCallback(async () => {
+    try {
+      await onSave(produto, 'saida', qSaida, observacao);
+      setQSaida('1');
+      setObservacao('');
+    } catch {
+      /* validação ou API: mensagem já exibida pelo pai */
+    }
+  }, [onSave, produto, qSaida, observacao]);
+
+  const idE = `estoque-entrada-qtd-${produto.id}`;
+  const idS = `estoque-saida-qtd-${produto.id}`;
+  const idObs = `estoque-obs-${produto.id}`;
 
   return (
-    <div className="estoque-movimento-editor-wrap">
-      <div className="estoque-qtd-editor estoque-qtd-editor--admin">
-        <select
-          className="estoque-input estoque-input--mov-tipo"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value === 'entrada' ? 'entrada' : 'saida')}
-          aria-label={`Tipo de lançamento para ${produto.nome}`}
-        >
-          <option value="saida">Saída</option>
-          <option value="entrada">Entrada</option>
-        </select>
-        <div className="estoque-qtd-com-presets">
-          <input
-            id={`qtd-${produto.id}`}
-            className="estoque-input estoque-input-qtd estoque-input-qtd--int"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            value={val}
-            onChange={onInputChange}
-            title="Quantidade que entra ou sai (não digite o saldo final aqui)"
-            aria-label={`Quantidade que entra ou sai para ${produto.nome}`}
-          />
-          <div className="estoque-qtd-presets" role="group" aria-label="Quantidades rápidas">
-            {[1, 5, 10].map((n) => (
-              <button
-                key={n}
-                type="button"
-                className="estoque-qtd-preset-btn"
-                onClick={() => setPreset(n)}
-              >
-                {n}
-              </button>
-            ))}
+    <div className="estoque-item-card-movimentos">
+      <div className="estoque-mov-duas-colunas">
+        <div className="estoque-mov-bloco estoque-mov-bloco--entrada">
+          <span className="estoque-mov-bloco-titulo">Entrada</span>
+          <p className="estoque-mov-bloco-texto">Somará ao estoque acima (compras, reposição…).</p>
+          <label className="estoque-mov-bloco-label" htmlFor={idE}>
+            Quantidade que entra neste lançamento
+          </label>
+          <div className="estoque-mov-bloco-linha-qtd">
+            <input
+              id={idE}
+              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
+              value={qEntrada}
+              onChange={(e) => setQEntrada(digitsOnly(e.target.value))}
+              aria-describedby={`${idE}-ajuda`}
+            />
+            <div className="estoque-qtd-presets" role="group" aria-label="Valores rápidos para entrada">
+              {[1, 5, 10].map((n) => (
+                <button key={n} type="button" className="estoque-qtd-preset-btn" onClick={() => setPresetEntrada(n)}>
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
+          <p id={`${idE}-ajuda`} className="estoque-mov-bloco-preview" role="status">
+            {previewEntrada !== null ? (
+              <>
+                Depois desta entrada o estoque será <strong>{previewEntrada}</strong>.
+              </>
+            ) : (
+              <span className="estoque-mov-bloco-preview--muted">Digite um número inteiro maior que zero.</span>
+            )}
+          </p>
+          <button type="button" className="estoque-btn estoque-btn--entrada" onClick={registrarEntrada}>
+            Registrar entrada
+          </button>
         </div>
+
+        <div className="estoque-mov-bloco estoque-mov-bloco--saida">
+          <span className="estoque-mov-bloco-titulo">Saída</span>
+          <p className="estoque-mov-bloco-texto">Subtrairá do estoque acima (uso, venda, perda…).</p>
+          <label className="estoque-mov-bloco-label" htmlFor={idS}>
+            Quantidade que sai neste lançamento
+          </label>
+          <div className="estoque-mov-bloco-linha-qtd">
+            <input
+              id={idS}
+              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
+              value={qSaida}
+              onChange={(e) => setQSaida(digitsOnly(e.target.value))}
+              aria-describedby={`${idS}-ajuda`}
+            />
+            <div className="estoque-qtd-presets" role="group" aria-label="Valores rápidos para saída">
+              {[1, 5, 10].map((n) => (
+                <button key={n} type="button" className="estoque-qtd-preset-btn" onClick={() => setPresetSaida(n)}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p id={`${idS}-ajuda`} className="estoque-mov-bloco-preview" role="status">
+            {previewSaida === null ? (
+              <span className="estoque-mov-bloco-preview--muted">Digite um número inteiro maior que zero.</span>
+            ) : previewSaida.erro ? (
+              <span className="estoque-mov-bloco-preview--erro">
+                Esta saída é maior que o estoque atual ({saldoAtual}). Reduza a quantidade.
+              </span>
+            ) : (
+              <>
+                Depois desta saída o estoque será <strong>{previewSaida.depois}</strong>.
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            className="estoque-btn estoque-btn--saida"
+            onClick={registrarSaida}
+            disabled={previewSaida?.erro === true}
+          >
+            Registrar saída
+          </button>
+        </div>
+      </div>
+
+      <div className="estoque-mov-obs-wrap">
+        <label className="estoque-mov-bloco-label" htmlFor={idObs}>
+          Observação (opcional) — salva junto com o botão de entrada ou de saída que você apertar
+        </label>
         <input
-          className="estoque-input estoque-input--mov-obs"
+          id={idObs}
+          className="estoque-input estoque-mov-obs-input"
           value={observacao}
           onChange={(e) => setObservacao(e.target.value)}
-          placeholder="Obs. (opcional)"
-          aria-label={`Observação do lançamento para ${produto.nome}`}
+          placeholder="Ex.: compra fornecedor, quebra, evento…"
+          autoComplete="off"
         />
-        <button
-          type="button"
-          className="estoque-btn-icon estoque-btn-icon--primary"
-          title="Lançar movimento"
-          aria-label={`Lançar movimento de ${produto.nome}`}
-          onClick={doSave}
-        >
-          <IconSave width={20} height={20} />
-        </button>
       </div>
-      {previewDepois && (
-        <p
-          className={
-            previewDepois.saidaExcede
-              ? 'estoque-movimento-preview-linha estoque-movimento-preview-linha--erro'
-              : 'estoque-movimento-preview-linha'
-          }
-          role="status"
-        >
-          {previewDepois.saidaExcede ? (
-            <>Saída maior que o saldo atual ({saldoAtual}).</>
-          ) : (
-            <>
-              Saldo após lançamento: <strong>{previewDepois.depois}</strong>
-            </>
-          )}
-        </p>
-      )}
     </div>
   );
 };

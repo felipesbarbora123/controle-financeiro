@@ -449,7 +449,7 @@
   padding-right: 0.5rem;
 }
 
-.estoque-produto--admin-linha:last-child {
+.estoque-produto--admin-linha:last-child:not(.estoque-item-card) {
   border-bottom: none;
 }
 
@@ -1067,4 +1067,244 @@
 
 .estoque-qtd-preset-btn:active {
   background: #e2e8f0;
+}
+
+/* Lista de itens — cartões com saldo e blocos entrada / saída */
+.estoque-modulo--lista-itens {
+  max-width: min(720px, 100%);
+}
+
+.estoque-lista-plana--admin {
+  gap: 1rem;
+}
+
+.estoque-item-card.estoque-produto--admin-linha {
+  list-style: none;
+  padding: 1rem 1.05rem 1.15rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+
+.estoque-lista-plana--grupo .estoque-item-card.estoque-produto--admin-linha:first-of-type {
+  padding-top: 1rem;
+}
+
+.estoque-item-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.estoque-item-card-identidade {
+  min-width: 0;
+  flex: 1;
+}
+
+.estoque-item-card-nome {
+  margin: 0 0 0.35rem;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.estoque-item-card-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.estoque-item-card-meta-label {
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.estoque-item-card-meta-valor {
+  color: #475569;
+}
+
+.estoque-item-card-meta-sep {
+  color: #cbd5e1;
+}
+
+.estoque-item-card-excluir {
+  flex-shrink: 0;
+}
+
+.estoque-item-card-saldo-destaque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.85rem 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.estoque-item-card-saldo-rotulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.estoque-item-card-saldo-numero {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.estoque-item-card-movimentos {
+  margin-top: 0.25rem;
+}
+
+.estoque-mov-duas-colunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+@media (max-width: 520px) {
+  .estoque-mov-duas-colunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.estoque-mov-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.8rem 0.75rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  min-width: 0;
+}
+
+.estoque-mov-bloco--entrada {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.estoque-mov-bloco--saida {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.estoque-mov-bloco-titulo {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.estoque-mov-bloco-texto {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.estoque-mov-bloco-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+
+.estoque-mov-bloco-linha-qtd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.estoque-mov-bloco-input {
+  width: 4.75rem;
+  min-width: 4rem;
+  margin-bottom: 0;
+}
+
+.estoque-mov-bloco-preview {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #475569;
+  min-height: 2.6em;
+}
+
+.estoque-mov-bloco-preview strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.estoque-mov-bloco-preview--muted {
+  color: #94a3b8;
+}
+
+.estoque-mov-bloco-preview--erro {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.estoque-btn {
+  min-height: 46px;
+  padding: 0 0.85rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 0.15rem;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estoque-btn--entrada {
+  background: #16a34a;
+  color: #fff;
+}
+
+.estoque-btn--entrada:active {
+  background: #15803d;
+}
+
+.estoque-btn--saida {
+  background: #fff;
+  color: #c2410c;
+  border: 2px solid #ea580c;
+}
+
+.estoque-btn--saida:active:not(:disabled) {
+  background: #fff7ed;
+}
+
+.estoque-btn--saida:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.estoque-mov-obs-wrap {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.estoque-mov-obs-input {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+  margin-top: 0.35rem;
 }
