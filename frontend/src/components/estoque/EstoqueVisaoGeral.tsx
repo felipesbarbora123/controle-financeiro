@@ -294,6 +294,14 @@ function digitsOnly(v: string): string {
   return d === '' ? '' : d;
 }
 
+/** Para stepper +/-: inteiro não negativo; vazio ou inválido = 0 */
+function parseIntQtyNaoNeg(s: string): number {
+  const t = String(s).trim();
+  if (!/^\d+$/.test(t)) return 0;
+  const n = parseInt(t, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => {
   const [qEntrada, setQEntrada] = useState('1');
   const [qSaida, setQSaida] = useState('1');
@@ -317,8 +325,13 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
     return { depois, erro: depois < 0 };
   }, [qSaida, saldoAtual]);
 
-  const setPresetEntrada = useCallback((n: number) => setQEntrada(String(n)), []);
-  const setPresetSaida = useCallback((n: number) => setQSaida(String(n)), []);
+  const bumpEntrada = useCallback((delta: number) => {
+    setQEntrada((prev) => String(Math.max(1, parseIntQtyNaoNeg(prev) + delta)));
+  }, []);
+
+  const bumpSaida = useCallback((delta: number) => {
+    setQSaida((prev) => String(Math.max(1, parseIntQtyNaoNeg(prev) + delta)));
+  }, []);
 
   const registrarEntrada = useCallback(async () => {
     try {
@@ -353,10 +366,23 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
           <label className="estoque-mov-bloco-label" htmlFor={idE}>
             Quantidade que entra neste lançamento
           </label>
-          <div className="estoque-mov-bloco-linha-qtd">
+          <div
+            className="estoque-mov-stepper"
+            role="group"
+            aria-label="Ajustar quantidade de entrada de um em um"
+          >
+            <button
+              type="button"
+              className="estoque-mov-stepper-btn"
+              onClick={() => bumpEntrada(-1)}
+              disabled={parseIntQtyNaoNeg(qEntrada) <= 1}
+              aria-label="Diminuir quantidade de entrada em um"
+            >
+              −
+            </button>
             <input
               id={idE}
-              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input"
+              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input estoque-mov-stepper-input"
               inputMode="numeric"
               pattern="[0-9]*"
               autoComplete="off"
@@ -364,13 +390,14 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
               onChange={(e) => setQEntrada(digitsOnly(e.target.value))}
               aria-describedby={`${idE}-ajuda`}
             />
-            <div className="estoque-qtd-presets" role="group" aria-label="Valores rápidos para entrada">
-              {[1, 5, 10].map((n) => (
-                <button key={n} type="button" className="estoque-qtd-preset-btn" onClick={() => setPresetEntrada(n)}>
-                  {n}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="estoque-mov-stepper-btn"
+              onClick={() => bumpEntrada(1)}
+              aria-label="Aumentar quantidade de entrada em um"
+            >
+              +
+            </button>
           </div>
           <p id={`${idE}-ajuda`} className="estoque-mov-bloco-preview" role="status">
             {previewEntrada !== null ? (
@@ -392,10 +419,23 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
           <label className="estoque-mov-bloco-label" htmlFor={idS}>
             Quantidade que sai neste lançamento
           </label>
-          <div className="estoque-mov-bloco-linha-qtd">
+          <div
+            className="estoque-mov-stepper"
+            role="group"
+            aria-label="Ajustar quantidade de saída de um em um"
+          >
+            <button
+              type="button"
+              className="estoque-mov-stepper-btn"
+              onClick={() => bumpSaida(-1)}
+              disabled={parseIntQtyNaoNeg(qSaida) <= 1}
+              aria-label="Diminuir quantidade de saída em um"
+            >
+              −
+            </button>
             <input
               id={idS}
-              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input"
+              className="estoque-input estoque-input-qtd estoque-input-qtd--int estoque-mov-bloco-input estoque-mov-stepper-input"
               inputMode="numeric"
               pattern="[0-9]*"
               autoComplete="off"
@@ -403,13 +443,14 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
               onChange={(e) => setQSaida(digitsOnly(e.target.value))}
               aria-describedby={`${idS}-ajuda`}
             />
-            <div className="estoque-qtd-presets" role="group" aria-label="Valores rápidos para saída">
-              {[1, 5, 10].map((n) => (
-                <button key={n} type="button" className="estoque-qtd-preset-btn" onClick={() => setPresetSaida(n)}>
-                  {n}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="estoque-mov-stepper-btn"
+              onClick={() => bumpSaida(1)}
+              aria-label="Aumentar quantidade de saída em um"
+            >
+              +
+            </button>
           </div>
           <p id={`${idS}-ajuda`} className="estoque-mov-bloco-preview" role="status">
             {previewSaida === null ? (

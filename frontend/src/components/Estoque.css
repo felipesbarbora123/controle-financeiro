@@ -1237,6 +1237,58 @@
   margin-bottom: 0;
 }
 
+.estoque-mov-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 13rem;
+}
+
+.estoque-mov-stepper-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estoque-mov-stepper-btn:active:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.estoque-mov-stepper-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.estoque-mov-bloco--entrada .estoque-mov-stepper-btn {
+  border-color: #86efac;
+}
+
+.estoque-mov-bloco--saida .estoque-mov-stepper-btn {
+  border-color: #fcd34d;
+}
+
+.estoque-mov-stepper-input {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 2.75rem !important;
+  max-width: none;
+  text-align: center;
+}
+
 .estoque-mov-bloco-preview {
   margin: 0;
   font-size: 0.78rem;
