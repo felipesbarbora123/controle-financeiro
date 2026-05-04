@@ -32,7 +32,7 @@ const Login = ({ onLogin }) => {
         const rootHealth = String(API_URL).replace(/\/api$/i, '') + '/health';
         setError(
           `Login 405: o servidor recusou POST em ${loginUrl}. ` +
-            `Neste build a base da API é: ${API_URL}. Se não for exatamente …financialmanagementapphomolog…/api, faça novo build do front com REACT_APP_API_URL definido (variável só vale na hora do npm run build). ` +
+            `Neste build a base da API é: ${API_URL}. Se a base não for o host da API (…financialmanagementapp…/api), faça build com REACT_APP_API_URL ou use o mapeamento automático Easypanel em config.js. ` +
             `Se a base estiver certa, no Easypanel encaminhe POST /api/* ao Node :5000. Teste JSON: ${apiHealth} e ${rootHealth}.`
         );
       } else {

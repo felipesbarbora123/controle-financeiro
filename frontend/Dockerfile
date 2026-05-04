@@ -14,6 +14,10 @@ RUN npm install
 # Copiar código fonte
 COPY . .
 
+# CRA embute REACT_APP_* no JS na hora do build; variável só no container em runtime não altera o bundle.
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Build da aplicação
 RUN npm run build
 

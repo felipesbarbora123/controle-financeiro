@@ -6,15 +6,17 @@ function trimTrailingSlashes(url) {
 }
 
 /**
- * Easypanel homolog: front em …financialmanagementhomolog… e API em …financialmanagementapphomolog…
- * Quando REACT_APP_API_URL não entra no build do CRA, o host da página seria o do front — POST /api iria para o React (405).
+ * Easypanel: front e API em hosts diferentes (…financialmanagement… vs …financialmanagementapp…).
+ * Homolog: …financialmanagementhomolog… → …financialmanagementapphomolog…
+ * Produção: …financialmanagement… (sem app) → …financialmanagementapp…
+ * Quando REACT_APP_API_URL não entra no build do CRA, sem este mapeamento POST /api iria para o nginx do front (405).
  */
 function easypanelHostnameToApiHost(hostname) {
   if (
-    hostname.includes('financialmanagementhomolog') &&
-    !hostname.includes('financialmanagementapphomolog')
+    hostname.includes('financialmanagement') &&
+    !hostname.includes('financialmanagementapp')
   ) {
-    return hostname.replace(/financialmanagementhomolog/gi, 'financialmanagementapphomolog');
+    return hostname.replace(/financialmanagement(?!app)/gi, 'financialmanagementapp');
   }
   return hostname;
 }
