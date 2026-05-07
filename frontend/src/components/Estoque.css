@@ -1846,3 +1846,65 @@
 .estoque-movimentacao-table--dia td:first-child {
   min-width: 8.5rem;
 }
+
+/* Visão geral — bloco de movimentação (dia/semana) */
+.estoque-resumo-mov {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1rem 1.15rem;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fafbfc;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.05);
+}
+
+.estoque-resumo-mov-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.estoque-resumo-mov-presets,
+.estoque-resumo-mov-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.estoque-resumo-mov-datas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.estoque-resumo-mov-err {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.estoque-resumo-mov-periodo {
+  margin: 0 0 0.65rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.estoque-resumo-mov-cards {
+  margin-bottom: 1rem;
+}
+
+.estoque-resumo-mov-tabela-wrap {
+  margin-top: 0.75rem;
+}
+
+.estoque-resumo-mov-sub {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}

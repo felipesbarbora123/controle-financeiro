@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
-import type { EstoqueAgrupadoResponse } from './estoque/estoqueTypes';
+import type { EstoqueAgrupadoResponse, ResumoMovimentosResponse } from './estoque/estoqueTypes';
 import './AdminDashboard.css';
 
 interface GastoRow {
@@ -9,11 +9,6 @@ interface GastoRow {
   valor?: string | number | null;
   pago?: boolean;
   data?: string;
-}
-
-interface ResumoMovimentosResponse {
-  totais: { entradas: number; saidas: number };
-  saidas_por_dia: Array<{ data: string; saidas: number }>;
 }
 
 interface Props {

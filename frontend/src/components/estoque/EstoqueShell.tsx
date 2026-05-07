@@ -118,10 +118,12 @@ const EstoqueShell: React.FC<Props> = ({
       <div className="estoque-shell-content" id="estoque-lancamento-panel">
         {effectiveView === 'resumo' && (
           <EstoqueResumo
+            restauranteId={restauranteId}
             categorias={categorias}
             loading={loading}
             onReload={carregar}
             onIrParaLancar={() => onViewChange('visao')}
+            onIrParaMovimentacao={() => onViewChange('movimentacao')}
           />
         )}
         {effectiveView === 'visao' && (

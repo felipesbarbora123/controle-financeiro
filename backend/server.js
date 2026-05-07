@@ -649,25 +649,48 @@ app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
       [rid]
     );
 
-    const prodResult = await pool.query(
-      `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade,
+    const sqlProdutosCompleto = `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade,
               p.quantidade_critica, p.foto_url, p.created_at, p.updated_at
        FROM estoque_produtos p
        WHERE p.restaurante_id = $1
-       ORDER BY p.nome ASC`,
-      [rid]
-    );
+       ORDER BY p.nome ASC`;
+    const sqlProdutosLegado = `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade,
+              p.created_at, p.updated_at
+       FROM estoque_produtos p
+       WHERE p.restaurante_id = $1
+       ORDER BY p.nome ASC`;
+
+    let prodResult;
+    try {
+      prodResult = await pool.query(sqlProdutosCompleto, [rid]);
+    } catch (err) {
+      if (err.code === '42703') {
+        console.warn(
+          '[estoque/agrupado] Colunas quantidade_critica/foto_url ausentes — rode a migração 011. Usando SELECT legado.'
+        );
+        prodResult = await pool.query(sqlProdutosLegado, [rid]);
+      } else {
+        throw err;
+      }
+    }
 
     const produtosPorCat = {};
     prodResult.rows.forEach((p) => {
       if (!produtosPorCat[p.categoria_id]) produtosPorCat[p.categoria_id] = [];
       const qn = Math.max(0, Math.round(Number(p.quantidade)) || 0);
-      const qc = Math.max(0, Math.round(Number(p.quantidade_critica)) || 0);
+      const qc =
+        p.quantidade_critica !== undefined && p.quantidade_critica !== null
+          ? Math.max(0, Math.round(Number(p.quantidade_critica)) || 0)
+          : 0;
+      const foto =
+        p.foto_url !== undefined && p.foto_url !== null && String(p.foto_url).trim() !== ''
+          ? String(p.foto_url).trim()
+          : null;
       produtosPorCat[p.categoria_id].push({
         ...p,
         quantidade: qn,
         quantidade_critica: qc,
-        foto_url: p.foto_url || null
+        foto_url: foto
       });
     });
 

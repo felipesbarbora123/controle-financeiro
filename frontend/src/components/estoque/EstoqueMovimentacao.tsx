@@ -2,19 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios';
 import { API_URL } from '../../config';
 import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
+import type { ResumoMovimentosResponse } from './estoqueTypes';
+import { addDays, formatarDiaPt, isoHoje } from './estoquePeriodoUtils';
 import '../Estoque.css';
 
-export interface ResumoMovimentosResponse {
-  restaurante_id: number;
-  periodo: { data_inicio: string; data_fim: string };
-  filtro?: { produto_id: number | null };
-  totais: { entradas: number; saidas: number };
-  por_produto: Array<{ produto_id: number; nome: string; entradas: number; saidas: number }>;
-  saidas_por_dia: Array<{ data: string; saidas: number }>;
-  /** Entradas e saídas agregadas por dia (preferir em relação a saidas_por_dia). */
-  movimentacao_por_dia?: Array<{ data: string; entradas: number; saidas: number }>;
-  saldos: Array<{ produto_id: number; nome: string; saldo_atual: number }>;
-}
+export type { ResumoMovimentosResponse };
 
 interface MovimentoRow {
   id: number;
@@ -47,14 +39,6 @@ interface Props {
   onLancamentoFeito?: () => void | Promise<void>;
 }
 
-function addDays(isoDate: string, days: number): string {
-  const [y, m, d] = isoDate.split('-').map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + days);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-}
-
 function formatarDataHora(iso: string): string {
   try {
     const d = new Date(iso);
@@ -62,25 +46,6 @@ function formatarDataHora(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function formatarDiaPt(dataIso: string): string {
-  const [y, m, d] = dataIso.split('-').map(Number);
-  if (!y || !m || !d) return dataIso;
-  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
-function isoHoje(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 const EstoqueMovimentacao: React.FC<Props> = ({

@@ -25,6 +25,17 @@ export interface EstoqueAgrupadoResponse {
   categorias: EstoqueCategoria[];
 }
 
+export interface ResumoMovimentosResponse {
+  restaurante_id: number;
+  periodo: { data_inicio: string; data_fim: string };
+  filtro?: { produto_id: number | null };
+  totais: { entradas: number; saidas: number };
+  por_produto: Array<{ produto_id: number; nome: string; entradas: number; saidas: number }>;
+  saidas_por_dia: Array<{ data: string; saidas: number }>;
+  movimentacao_por_dia?: Array<{ data: string; entradas: number; saidas: number }>;
+  saldos: Array<{ produto_id: number; nome: string; saldo_atual: number }>;
+}
+
 export type EstoqueView = 'resumo' | 'visao' | 'categorias' | 'produtos' | 'movimentacao';
 
 export const UNIDADES_SUGERIDAS = ['un', 'kg', 'g', 'lt', 'ml', 'cx', 'fd', 'pct', 'dz'];
