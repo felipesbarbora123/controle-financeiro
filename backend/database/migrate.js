@@ -30,7 +30,8 @@ async function migrate() {
       '007_usuario_restaurante_estoque.sql',
       '008_estoque_movimentos.sql',
       '009_estoque_movimentos_operacao_estorno.sql',
-      '010_estoque_movimentos_trigger_defaults.sql'
+      '010_estoque_movimentos_trigger_defaults.sql',
+      '011_estoque_produto_critica_foto.sql'
     ];
     
     for (const migrationFile of migrations) {

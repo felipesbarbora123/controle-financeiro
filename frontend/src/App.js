@@ -56,7 +56,7 @@ function App() {
       return 'gastos';
     }
   }); // 'inicio' | 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
-  const [estoqueView, setEstoqueView] = useState('visao'); // visao | categorias | produtos | movimentacao
+  const [estoqueView, setEstoqueView] = useState('resumo'); // resumo | visao | categorias | produtos | movimentacao
   const [msgEstoque, setMsgEstoque] = useState(null);
   const [estoqueMovPresetPeriodo, setEstoqueMovPresetPeriodo] = useState(null);
 
@@ -74,7 +74,7 @@ function App() {
   useEffect(() => {
     if (user?.somente_estoque) {
       setTelaAtual('estoque');
-      setEstoqueView('visao');
+      setEstoqueView('resumo');
     }
   }, [user]);
 
@@ -138,7 +138,7 @@ function App() {
     setIsAuthenticated(true);
     if (userData.somente_estoque) {
       setTelaAtual('estoque');
-      setEstoqueView('visao');
+      setEstoqueView('resumo');
     } else if (userData.is_admin) {
       setTelaAtual('inicio');
     } else {
@@ -332,9 +332,9 @@ function App() {
     return `${y}-${m}-${day}`;
   };
 
-  const irParaEstoque = (view = 'visao', opts = {}) => {
-    const ok = ['visao', 'categorias', 'produtos', 'movimentacao'].includes(view);
-    setEstoqueView(ok ? view : 'visao');
+  const irParaEstoque = (view = 'resumo', opts = {}) => {
+    const ok = ['resumo', 'visao', 'categorias', 'produtos', 'movimentacao'].includes(view);
+    setEstoqueView(ok ? view : 'resumo');
     if (opts?.periodoHoje && view === 'movimentacao') {
       const h = hojeIso();
       setEstoqueMovPresetPeriodo({
@@ -413,10 +413,10 @@ function App() {
             )}
             <button
               type="button"
-              onClick={() => irParaEstoque('visao')}
+              onClick={() => irParaEstoque('resumo')}
               className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
             >
-              {somenteEstoque ? 'Lançar estoque' : 'Estoque'}
+              Estoque
             </button>
           </div>
           {(telaAtual === 'gastos' ||
@@ -467,7 +467,7 @@ function App() {
             gastos={gastos}
             onIrParaGastos={() => setTelaAtual('gastos')}
             onIrParaRelatorios={() => setTelaAtual('relatorios')}
-            onIrParaEstoque={(view) => irParaEstoque(view || 'visao')}
+            onIrParaEstoque={(view) => irParaEstoque(view || 'resumo')}
             onIrParaMovimentacaoHoje={() => irParaEstoque('movimentacao', { periodoHoje: true })}
             onIrParaRestaurantes={() => setTelaAtual('restaurantes')}
             onIrParaUsuariosEstoque={() => {

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
+import { criticaIntEstoque, isEstoqueAbaixoOuCritico, saldoIntEstoque } from './estoqueProdutoUtils';
 import { IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
 
@@ -83,15 +84,25 @@ function classeAtualizacao(iso?: string | null): string {
   return '';
 }
 
-function saldoInteiroProduto(p: EstoqueProduto): number {
-  return Math.max(0, Math.round(Number(p.quantidade)) || 0);
-}
-
-const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAdmin, excluirProduto }) => (
-  <li className={`estoque-item-card estoque-produto--admin-linha ${classeAtualizacao(produto.updated_at)}`.trim()}>
+const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAdmin, excluirProduto }) => {
+  const saldo = saldoIntEstoque(produto);
+  const lim = criticaIntEstoque(produto);
+  const critico = isEstoqueAbaixoOuCritico(produto);
+  return (
+  <li
+    className={`estoque-item-card estoque-produto--admin-linha ${classeAtualizacao(produto.updated_at)} ${critico ? 'estoque-item-card--critico' : ''}`.trim()}
+  >
     <div className="estoque-item-card-top">
+      {produto.foto_url?.trim() ? (
+        <img src={produto.foto_url} alt="" className="estoque-item-card-foto" loading="lazy" />
+      ) : null}
       <div className="estoque-item-card-identidade">
         <h3 className="estoque-item-card-nome">{produto.nome}</h3>
+        {critico && (
+          <p className="estoque-item-card-alerta" role="status">
+            Atenção: estoque no limite ou abaixo do mínimo ({lim}).
+          </p>
+        )}
         <p className="estoque-item-card-meta">
           <span className="estoque-item-card-meta-label">Como contar / unidade</span>{' '}
           <span className="estoque-item-card-meta-valor">{produto.unidade?.trim() || '—'}</span>
@@ -100,6 +111,15 @@ const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAd
           </span>
           <span className="estoque-item-card-meta-label">Última alteração</span>{' '}
           <span className="estoque-item-card-meta-valor">{formatAtualizacao(produto.updated_at)}</span>
+          {lim > 0 ? (
+            <>
+              <span className="estoque-item-card-meta-sep" aria-hidden="true">
+                {' · '}
+              </span>
+              <span className="estoque-item-card-meta-label">Crítico</span>{' '}
+              <span className="estoque-item-card-meta-valor">{lim}</span>
+            </>
+          ) : null}
         </p>
       </div>
       {isAdmin && (
@@ -117,12 +137,13 @@ const LinhaItemEstoque: React.FC<LinhaProps> = ({ produto, salvarMovimento, isAd
 
     <div className="estoque-item-card-saldo-destaque" aria-live="polite">
       <span className="estoque-item-card-saldo-rotulo">Quantidade em estoque agora</span>
-      <span className="estoque-item-card-saldo-numero">{saldoInteiroProduto(produto)}</span>
+      <span className="estoque-item-card-saldo-numero">{saldo}</span>
     </div>
 
     <MovimentoEditorEntradaSaida produto={produto} onSave={salvarMovimento} />
   </li>
 );
+};
 
 const EstoqueVisaoGeral: React.FC<Props> = ({
   categorias,
@@ -161,7 +182,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
       await movimentarProduto(
         produto.id,
         { tipo, quantidade: q, observacao: (observacao || '').trim() },
-        Number(produto.quantidade)
+        saldoIntEstoque(produto)
       );
       await onReload();
     } catch (err: unknown) {
@@ -186,7 +207,7 @@ const EstoqueVisaoGeral: React.FC<Props> = ({
     return <div className="estoque-loading">Carregando estoque…</div>;
   }
 
-  const tituloTela = modoOperador ? 'Lançar estoque' : 'Itens';
+  const tituloTela = modoOperador ? 'Lançar entrada e saída' : 'Entrada e saída';
 
   const semItensNoRestaurante = categorias.length === 0 || flattenProdutos(categorias).length === 0;
   const vazioLista =
@@ -306,7 +327,7 @@ const MovimentoEditorEntradaSaida: React.FC<QEProps> = ({ produto, onSave }) => 
   const [qEntrada, setQEntrada] = useState('1');
   const [qSaida, setQSaida] = useState('1');
   const [observacao, setObservacao] = useState('');
-  const saldoAtual = useMemo(() => saldoInteiroProduto(produto), [produto.quantidade]);
+  const saldoAtual = useMemo(() => saldoIntEstoque(produto), [produto]);
 
   const previewEntrada = useMemo(() => {
     const s = String(qEntrada).trim();

@@ -22,7 +22,7 @@ interface Props {
   gastos: GastoRow[];
   onIrParaGastos: () => void;
   onIrParaRelatorios: () => void;
-  onIrParaEstoque: (view?: 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
+  onIrParaEstoque: (view?: 'resumo' | 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
   onIrParaMovimentacaoHoje?: () => void;
   onIrParaRestaurantes: () => void;
   onIrParaUsuariosEstoque?: () => void;
@@ -201,8 +201,11 @@ const AdminDashboard: React.FC<Props> = ({
         <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaRelatorios}>
           Relatórios
         </button>
+        <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('resumo')}>
+          Visão geral estoque
+        </button>
         <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('visao')}>
-          Itens estoque
+          Entrada e saída
         </button>
         <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={() => onIrParaEstoque('movimentacao')}>
           Movimentação

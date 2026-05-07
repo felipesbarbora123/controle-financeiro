@@ -15,6 +15,8 @@ const {
   normalizeQuantidadeInt
 } = require('./lib/estoqueQuantidade');
 
+const MAX_ESTOQUE_FOTO_URL_LEN = 400000;
+
 /** Usuários com somente_estoque=true não acessam rotas financeiras (gastos). */
 const requireFinanceiroAccess = (req, res, next) => {
   if (req.user && req.user.somente_estoque === true) {
@@ -648,7 +650,8 @@ app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
     );
 
     const prodResult = await pool.query(
-      `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade, p.created_at, p.updated_at
+      `SELECT p.id, p.restaurante_id, p.categoria_id, p.nome, p.unidade, p.quantidade,
+              p.quantidade_critica, p.foto_url, p.created_at, p.updated_at
        FROM estoque_produtos p
        WHERE p.restaurante_id = $1
        ORDER BY p.nome ASC`,
@@ -659,7 +662,13 @@ app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
     prodResult.rows.forEach((p) => {
       if (!produtosPorCat[p.categoria_id]) produtosPorCat[p.categoria_id] = [];
       const qn = Math.max(0, Math.round(Number(p.quantidade)) || 0);
-      produtosPorCat[p.categoria_id].push({ ...p, quantidade: qn });
+      const qc = Math.max(0, Math.round(Number(p.quantidade_critica)) || 0);
+      produtosPorCat[p.categoria_id].push({
+        ...p,
+        quantidade: qn,
+        quantidade_critica: qc,
+        foto_url: p.foto_url || null
+      });
     });
 
     const categorias = catResult.rows.map((c) => ({
@@ -737,7 +746,7 @@ app.delete('/api/estoque/categorias/:id', authenticateToken, requireAdmin, async
 
 // CRUD produtos
 app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, res) => {
-  const { restaurante_id, categoria_id, nome, unidade, quantidade } = req.body;
+  const { restaurante_id, categoria_id, nome, unidade, quantidade, quantidade_critica, foto_url } = req.body;
   if (!restaurante_id || !categoria_id || !nome || String(nome).trim() === '') {
     return res.status(400).json({ error: 'restaurante_id, categoria_id e nome são obrigatórios' });
   }
@@ -749,14 +758,29 @@ app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, r
     return res.status(400).json({ error: qParsed.error });
   }
   const qtd = qParsed.value;
+  const critParsed = parseEstoqueQuantidadeInt(
+    quantidade_critica !== undefined && quantidade_critica !== null ? quantidade_critica : 0
+  );
+  if (!critParsed.ok) {
+    return res.status(400).json({ error: 'quantidade_critica inválida' });
+  }
+  const critica = critParsed.value;
+  let fotoVal = null;
+  if (foto_url != null && String(foto_url).trim() !== '') {
+    const fs = String(foto_url).trim();
+    if (fs.length > MAX_ESTOQUE_FOTO_URL_LEN) {
+      return res.status(400).json({ error: 'Imagem ou URL muito grande. Reduza o tamanho ou use um link.' });
+    }
+    fotoVal = fs;
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade, quantidade_critica, foto_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [restaurante_id, categoria_id, String(nome).trim(), un, qtd]
+      [restaurante_id, categoria_id, String(nome).trim(), un, qtd, critica, fotoVal]
     );
     const row = result.rows[0];
     if (qtd > 0) {
@@ -822,12 +846,35 @@ app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
         }
         quantidadeVal = qp.value;
       }
+      let criticaVal = normalizeQuantidadeInt(row.quantidade_critica);
+      if (body.quantidade_critica !== undefined && body.quantidade_critica !== null) {
+        const cp = parseEstoqueQuantidadeInt(body.quantidade_critica);
+        if (!cp.ok) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: cp.error });
+        }
+        criticaVal = cp.value;
+      }
+      let fotoVal = row.foto_url || null;
+      if (body.foto_url !== undefined) {
+        if (body.foto_url === null || body.foto_url === '') {
+          fotoVal = null;
+        } else {
+          const fs = String(body.foto_url).trim();
+          if (fs.length > MAX_ESTOQUE_FOTO_URL_LEN) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Imagem ou URL muito grande. Reduza o tamanho ou use um link.' });
+          }
+          fotoVal = fs;
+        }
+      }
       const result = await client.query(
         `UPDATE estoque_produtos
-         SET categoria_id = $1, nome = $2, unidade = $3, quantidade = $4, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5
+         SET categoria_id = $1, nome = $2, unidade = $3, quantidade = $4,
+             quantidade_critica = $5, foto_url = $6, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7
          RETURNING *`,
-        [categoria_id, nome, unidade, quantidadeVal, id]
+        [categoria_id, nome, unidade, quantidadeVal, criticaVal, fotoVal, id]
       );
       await inserirMovimentoEstoque(client, {
         produtoId: Number(id),
@@ -1104,6 +1151,17 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
       paramsBase
     );
 
+    const movimentacaoPorDia = await pool.query(
+      `SELECT m.created_at::date AS data,
+        COALESCE(SUM(CASE WHEN m.diferenca > 0 THEN m.diferenca ELSE 0 END), 0)::int AS entradas,
+        COALESCE(SUM(CASE WHEN m.diferenca < 0 THEN -m.diferenca ELSE 0 END), 0)::int AS saidas
+       FROM estoque_movimentos m
+       WHERE ${where}
+       GROUP BY m.created_at::date
+       ORDER BY m.created_at::date ASC`,
+      paramsBase
+    );
+
     const saldos = await pool.query(
       `SELECT p.id AS produto_id, p.nome, p.quantidade::int AS saldo_atual
        FROM estoque_produtos p
@@ -1124,6 +1182,7 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
       },
       por_produto: Array.isArray(porProduto.rows) ? porProduto.rows : [],
       saidas_por_dia: Array.isArray(saidasPorDia.rows) ? saidasPorDia.rows : [],
+      movimentacao_por_dia: Array.isArray(movimentacaoPorDia.rows) ? movimentacaoPorDia.rows : [],
       saldos: Array.isArray(saldos.rows) ? saldos.rows : []
     });
   } catch (error) {

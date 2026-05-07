@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueAgrupadoResponse, EstoqueCategoria, EstoqueView } from './estoqueTypes';
+import EstoqueResumo from './EstoqueResumo';
 import EstoqueVisaoGeral from './EstoqueVisaoGeral';
 import EstoqueCategorias from './EstoqueCategorias';
 import EstoqueProdutos from './EstoqueProdutos';
@@ -75,18 +76,21 @@ const EstoqueShell: React.FC<Props> = ({
     }
   }, [isAdmin, view, onViewChange]);
 
+  const effectiveView: EstoqueView = isAdmin
+    ? view
+    : view === 'movimentacao'
+      ? 'movimentacao'
+      : view === 'resumo'
+        ? 'resumo'
+        : 'visao';
+
   if (!restauranteId) {
     return <div className="estoque-empty">Selecione um restaurante.</div>;
   }
 
-  const effectiveView: EstoqueView = !isAdmin
-    ? view === 'movimentacao'
-      ? 'movimentacao'
-      : 'visao'
-    : view;
-
   const subNavItems: { id: EstoqueView; label: string; adminOnly?: boolean }[] = [
-    { id: 'visao', label: isAdmin ? 'Itens' : 'Lançar estoque' },
+    { id: 'resumo', label: 'Visão geral' },
+    { id: 'visao', label: isAdmin ? 'Entrada e saída' : 'Lançar entrada e saída' },
     { id: 'movimentacao', label: 'Movimentação' },
     { id: 'categorias', label: 'Categorias', adminOnly: true },
     { id: 'produtos', label: 'Produtos', adminOnly: true }
@@ -102,7 +106,7 @@ const EstoqueShell: React.FC<Props> = ({
             <button
               key={item.id}
               type="button"
-              className={`estoque-subnav-btn ${view === item.id ? 'estoque-subnav-btn--active' : ''}`}
+              className={`estoque-subnav-btn ${effectiveView === item.id ? 'estoque-subnav-btn--active' : ''}`}
               onClick={() => onViewChange(item.id)}
             >
               {item.label}
@@ -112,6 +116,14 @@ const EstoqueShell: React.FC<Props> = ({
       </nav>
 
       <div className="estoque-shell-content" id="estoque-lancamento-panel">
+        {effectiveView === 'resumo' && (
+          <EstoqueResumo
+            categorias={categorias}
+            loading={loading}
+            onReload={carregar}
+            onIrParaLancar={() => onViewChange('visao')}
+          />
+        )}
         {effectiveView === 'visao' && (
           <EstoqueVisaoGeral
             categorias={categorias}

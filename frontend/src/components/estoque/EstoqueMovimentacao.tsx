@@ -11,6 +11,8 @@ export interface ResumoMovimentosResponse {
   totais: { entradas: number; saidas: number };
   por_produto: Array<{ produto_id: number; nome: string; entradas: number; saidas: number }>;
   saidas_por_dia: Array<{ data: string; saidas: number }>;
+  /** Entradas e saídas agregadas por dia (preferir em relação a saidas_por_dia). */
+  movimentacao_por_dia?: Array<{ data: string; entradas: number; saidas: number }>;
   saldos: Array<{ produto_id: number; nome: string; saldo_atual: number }>;
 }
 
@@ -60,6 +62,25 @@ function formatarDataHora(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function formatarDiaPt(dataIso: string): string {
+  const [y, m, d] = dataIso.split('-').map(Number);
+  if (!y || !m || !d) return dataIso;
+  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function isoHoje(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 const EstoqueMovimentacao: React.FC<Props> = ({
@@ -149,6 +170,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({
           totais: raw.totais ?? { entradas: 0, saidas: 0 },
           por_produto: raw.por_produto ?? [],
           saidas_por_dia: raw.saidas_por_dia ?? [],
+          movimentacao_por_dia: raw.movimentacao_por_dia ?? [],
           saldos: raw.saldos ?? []
         });
         setLista(lRes.data?.movimentos ?? []);
@@ -180,6 +202,21 @@ const EstoqueMovimentacao: React.FC<Props> = ({
   const aplicarPeriodoDigitado = () => {
     if (!dataInicio || !dataFim) return;
     carregar(dataInicio, dataFim);
+  };
+
+  const aplicarHoje = () => {
+    const h = isoHoje();
+    setDataInicio(h);
+    setDataFim(h);
+    carregar(h, h);
+  };
+
+  const aplicarUltimos7Dias = () => {
+    const f = isoHoje();
+    const i = addDays(f, -6);
+    setDataInicio(i);
+    setDataFim(f);
+    carregar(i, f);
   };
 
   const recarregarPeriodoAtual = useCallback(async () => {
@@ -246,8 +283,15 @@ const EstoqueMovimentacao: React.FC<Props> = ({
   };
 
   const periodoLabel = resumo
-    ? `${resumo.periodo.data_inicio} → ${resumo.periodo.data_fim}`
+    ? `${formatarDiaPt(resumo.periodo.data_inicio)} — ${formatarDiaPt(resumo.periodo.data_fim)}`
     : '';
+
+  const movimentoPorDia = useMemo(() => {
+    const m = resumo?.movimentacao_por_dia;
+    if (m && m.length > 0) return m;
+    const s = resumo?.saidas_por_dia ?? [];
+    return s.map((r) => ({ data: r.data, entradas: 0, saidas: r.saidas }));
+  }, [resumo?.movimentacao_por_dia, resumo?.saidas_por_dia]);
 
   return (
     <div className="estoque-modulo estoque-modulo--screen estoque-movimentacao">
@@ -259,9 +303,9 @@ const EstoqueMovimentacao: React.FC<Props> = ({
       </div>
 
       <p className="estoque-movimentacao-intro">
-        Relatório por período abaixo. Para <strong>lançar</strong>: informe quantos itens <strong>entram</strong> (somam ao saldo) ou{' '}
-        <strong>saem</strong> (subtraem) — não é o saldo final desejado. Use o bloco rápido ou a aba{' '}
-        <strong>{'Itens / Lançar estoque'}</strong>.
+        Veja <strong>entradas e saídas por dia</strong> no período escolhido. Use os atalhos <strong>Hoje</strong> ou{' '}
+        <strong>Últimos 7 dias</strong> para comparar o consumo recente. Para lançar movimentos: bloco rápido abaixo ou a aba{' '}
+        <strong>Entrada e saída</strong>.
       </p>
 
       {produtosCatalogo.length > 0 && (
@@ -331,6 +375,17 @@ const EstoqueMovimentacao: React.FC<Props> = ({
       )}
 
       <section className="estoque-movimentacao-filtros" aria-label="Período">
+        <div className="estoque-mov-presets" role="group" aria-label="Atalhos de período">
+          <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={aplicarHoje}>
+            Hoje
+          </button>
+          <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={aplicarUltimos7Dias}>
+            Últimos 7 dias
+          </button>
+          <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={semanaAtual}>
+            Semana (seg–dom)
+          </button>
+        </div>
         <div className="estoque-movimentacao-datas">
           <label className="estoque-movimentacao-label">
             De
@@ -374,7 +429,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({
             ← Semana anterior
           </button>
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={semanaAtual}>
-            Semana atual
+            Recarregar semana padrão
           </button>
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={semanaProxima}>
             Próxima semana →
@@ -426,23 +481,25 @@ const EstoqueMovimentacao: React.FC<Props> = ({
             )}
           </section>
 
-          <section className="estoque-movimentacao-tabela-wrap" aria-label="Saídas por dia">
-            <h3 className="estoque-subsection-title">Saídas diárias</h3>
-            {resumo.saidas_por_dia.length === 0 ? (
-              <p className="estoque-empty-msg">Sem saídas no período.</p>
+          <section className="estoque-movimentacao-tabela-wrap" aria-label="Movimento por dia">
+            <h3 className="estoque-subsection-title">Movimento por dia</h3>
+            {movimentoPorDia.length === 0 ? (
+              <p className="estoque-empty-msg">Nenhum lançamento neste período.</p>
             ) : (
-              <table className="estoque-movimentacao-table">
+              <table className="estoque-movimentacao-table estoque-movimentacao-table--dia">
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th>Saídas</th>
+                    <th>Dia</th>
+                    <th className="estoque-movimentacao-th-num">Entradas</th>
+                    <th className="estoque-movimentacao-th-num">Saídas</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {resumo.saidas_por_dia.map((row) => (
+                  {movimentoPorDia.map((row) => (
                     <tr key={row.data}>
-                      <td>{row.data}</td>
-                      <td>{row.saidas}</td>
+                      <td>{formatarDiaPt(row.data)}</td>
+                      <td className="estoque-movimentacao-td-num">{row.entradas}</td>
+                      <td className="estoque-movimentacao-td-num">{row.saidas}</td>
                     </tr>
                   ))}
                 </tbody>
