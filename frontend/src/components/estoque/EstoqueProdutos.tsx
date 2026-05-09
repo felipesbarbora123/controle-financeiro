@@ -50,6 +50,10 @@ const EstoqueProdutos: React.FC<Props> = ({
   });
 
   const [editOpen, setEditOpen] = useState<number | null>(null);
+  const [editNome, setEditNome] = useState('');
+  const [editCategoriaId, setEditCategoriaId] = useState('');
+  const [editUnidade, setEditUnidade] = useState('');
+  const [editQuantidade, setEditQuantidade] = useState('0');
   const [editCritica, setEditCritica] = useState('');
   const [editFoto, setEditFoto] = useState('');
   const [editSaving, setEditSaving] = useState(false);
@@ -106,13 +110,22 @@ const EstoqueProdutos: React.FC<Props> = ({
 
   const abrirEditar = (p: EstoqueProduto) => {
     setEditOpen(p.id);
+    setEditNome(p.nome);
+    setEditCategoriaId(String(p.categoria_id));
+    setEditUnidade(p.unidade || '');
+    setEditQuantidade(String(saldoIntEstoque(p)));
     setEditCritica(String(Math.max(0, Math.round(Number(p.quantidade_critica)) || 0)));
     setEditFoto(p.foto_url?.trim() || '');
   };
 
-  const salvarLimiteFoto = async (p: EstoqueProduto) => {
+  const salvarEdicao = async (produtoId: number) => {
+    if (!editNome.trim() || !editCategoriaId) {
+      onMessage?.('Nome e categoria são obrigatórios.');
+      return;
+    }
     onMessage?.(null);
     const qc = Math.max(0, parseInt(String(editCritica).replace(/\D/g, ''), 10) || 0);
+    const qtd = Math.max(0, parseInt(String(editQuantidade).replace(/\D/g, ''), 10) || 0);
     const foto = editFoto.trim();
     if (foto.length > 400000) {
       onMessage?.('URL ou imagem muito longa.');
@@ -120,11 +133,11 @@ const EstoqueProdutos: React.FC<Props> = ({
     }
     setEditSaving(true);
     try {
-      await axios.put(`${API_URL}/estoque/produtos/${p.id}`, {
-        categoria_id: p.categoria_id,
-        nome: p.nome,
-        unidade: p.unidade,
-        quantidade: saldoIntEstoque(p),
+      await axios.put(`${API_URL}/estoque/produtos/${produtoId}`, {
+        categoria_id: Number(editCategoriaId),
+        nome: editNome.trim(),
+        unidade: (editUnidade && editUnidade.trim()) || 'un',
+        quantidade: qtd,
         quantidade_critica: qc,
         foto_url: foto || null
       });
@@ -342,7 +355,7 @@ const EstoqueProdutos: React.FC<Props> = ({
                               className="estoque-btn-secondary estoque-btn-small"
                               onClick={() => (editOpen === p.id ? setEditOpen(null) : abrirEditar(p))}
                             >
-                              {editOpen === p.id ? 'Fechar' : 'Limite / foto'}
+                              {editOpen === p.id ? 'Fechar' : 'Editar'}
                             </button>
                             <button
                               type="button"
@@ -357,6 +370,48 @@ const EstoqueProdutos: React.FC<Props> = ({
                         </div>
                         {editOpen === p.id && (
                           <div className="estoque-produto-edit">
+                            <label className="estoque-label">Nome do item</label>
+                            <input
+                              className="estoque-input"
+                              value={editNome}
+                              onChange={(e) => setEditNome(e.target.value)}
+                            />
+                            <label className="estoque-label">Categoria</label>
+                            <select
+                              className="estoque-input"
+                              value={editCategoriaId}
+                              onChange={(e) => setEditCategoriaId(e.target.value)}
+                            >
+                              {categorias.map((c) => (
+                                <option key={c.id} value={String(c.id)}>
+                                  {c.nome}
+                                </option>
+                              ))}
+                            </select>
+                            <label className="estoque-label">Como contar / unidade</label>
+                            <input
+                              className="estoque-input"
+                              list="estoque-unidades-sugestao-edit"
+                              value={editUnidade}
+                              onChange={(e) => setEditUnidade(e.target.value)}
+                            />
+                            <datalist id="estoque-unidades-sugestao-edit">
+                              {UNIDADES_SUGERIDAS.map((u) => (
+                                <option key={u} value={u} />
+                              ))}
+                            </datalist>
+                            <label className="estoque-label">Quantidade em estoque (ajuste manual)</label>
+                            <input
+                              className="estoque-input"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={editQuantidade}
+                              onChange={(e) => setEditQuantidade(e.target.value.replace(/\D/g, '') || '0')}
+                            />
+                            <p className="estoque-hint-foto">
+                              Alterar este número grava um ajuste no histórico de movimentação. Prefira entrada/saída na aba correspondente
+                              quando possível.
+                            </p>
                             <label className="estoque-label">Quantidade crítica (0 = sem alerta)</label>
                             <input
                               className="estoque-input"
@@ -380,9 +435,9 @@ const EstoqueProdutos: React.FC<Props> = ({
                                 type="button"
                                 className="estoque-btn-primary estoque-btn-small"
                                 disabled={editSaving}
-                                onClick={() => salvarLimiteFoto(p)}
+                                onClick={() => salvarEdicao(p.id)}
                               >
-                                {editSaving ? 'Salvando…' : 'Salvar'}
+                                {editSaving ? 'Salvando…' : 'Salvar alterações'}
                               </button>
                               <button
                                 type="button"
@@ -390,6 +445,13 @@ const EstoqueProdutos: React.FC<Props> = ({
                                 onClick={() => setEditFoto('')}
                               >
                                 Limpar foto
+                              </button>
+                              <button
+                                type="button"
+                                className="estoque-btn-secondary estoque-btn-small"
+                                onClick={() => setEditOpen(null)}
+                              >
+                                Cancelar
                               </button>
                             </div>
                           </div>

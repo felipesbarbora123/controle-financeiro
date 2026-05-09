@@ -3,27 +3,11 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import type { ResumoMovimentosResponse } from './estoqueTypes';
-import { addDays, formatarDiaPt, isoHoje } from './estoquePeriodoUtils';
+import { addDays, formatarDiaPt, isoHoje, normalizaDataIsoDia } from './estoquePeriodoUtils';
+import EstoqueMovimentosLista, { type EstoqueMovimentoLinha } from './EstoqueMovimentosLista';
 import '../Estoque.css';
 
 export type { ResumoMovimentosResponse };
-
-interface MovimentoRow {
-  id: number;
-  produto_id: number;
-  produto_nome: string;
-  quantidade_antes: number;
-  quantidade_depois: number;
-  diferenca: number;
-  tipo?: string;
-  quantidade?: number;
-  observacao?: string | null;
-  estornado?: boolean;
-  estornado_por_movimento_id?: number | null;
-  movimento_estorno_de_id?: number | null;
-  created_at: string;
-  usuario_nome: string | null;
-}
 
 export interface EstoqueCatalogoItem {
   id: number;
@@ -37,15 +21,6 @@ interface Props {
   periodoPreset?: { data_inicio: string; data_fim: string; token: number } | null;
   produtosCatalogo?: EstoqueCatalogoItem[];
   onLancamentoFeito?: () => void | Promise<void>;
-}
-
-function formatarDataHora(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-  } catch {
-    return iso;
-  }
 }
 
 const EstoqueMovimentacao: React.FC<Props> = ({
@@ -63,7 +38,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [resumo, setResumo] = useState<ResumoMovimentosResponse | null>(null);
-  const [lista, setLista] = useState<MovimentoRow[]>([]);
+  const [lista, setLista] = useState<EstoqueMovimentoLinha[]>([]);
   const [produtoId, setProdutoId] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -125,7 +100,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({
 
         const [rRes, lRes] = await Promise.all([
           axios.get<ResumoMovimentosResponse>(`${API_URL}/estoque/movimentos/resumo`, { params: paramsResumo }),
-          axios.get<{ movimentos?: MovimentoRow[] }>(`${API_URL}/estoque/movimentos`, { params: paramsLista })
+          axios.get<{ movimentos?: EstoqueMovimentoLinha[] }>(`${API_URL}/estoque/movimentos`, { params: paramsLista })
         ]);
         const raw = rRes.data;
         const periodo = raw.periodo ?? { data_inicio: '', data_fim: '' };
@@ -253,9 +228,15 @@ const EstoqueMovimentacao: React.FC<Props> = ({
 
   const movimentoPorDia = useMemo(() => {
     const m = resumo?.movimentacao_por_dia;
-    if (m && m.length > 0) return m;
+    if (m && m.length > 0) {
+      return m.map((row) => ({ ...row, data: normalizaDataIsoDia(row.data) }));
+    }
     const s = resumo?.saidas_por_dia ?? [];
-    return s.map((r) => ({ data: r.data, entradas: 0, saidas: r.saidas }));
+    return s.map((r) => ({
+      data: normalizaDataIsoDia(r.data),
+      entradas: 0,
+      saidas: r.saidas
+    }));
   }, [resumo?.movimentacao_por_dia, resumo?.saidas_por_dia]);
 
   return (
@@ -268,9 +249,9 @@ const EstoqueMovimentacao: React.FC<Props> = ({
       </div>
 
       <p className="estoque-movimentacao-intro">
-        Veja <strong>entradas e saídas por dia</strong> no período escolhido. Use os atalhos <strong>Hoje</strong> ou{' '}
-        <strong>Últimos 7 dias</strong> para comparar o consumo recente. Para lançar movimentos: bloco rápido abaixo ou a aba{' '}
-        <strong>Entrada e saída</strong>.
+        Para ver <strong>só um produto</strong> (histórico e totais daquele item), escolha-o no filtro <strong>Produto</strong> abaixo. Use{' '}
+        <strong>Hoje</strong>, <strong>Últimos 7 dias</strong> ou as setas para semanas passadas. Lançamentos: bloco rápido ou aba{' '}
+        <strong>Entrada e saída</strong>. A <strong>Visão geral</strong> também tem histórico por produto.
       </p>
 
       {produtosCatalogo.length > 0 && (
@@ -339,7 +320,24 @@ const EstoqueMovimentacao: React.FC<Props> = ({
         </section>
       )}
 
-      <section className="estoque-movimentacao-filtros" aria-label="Período">
+      <section className="estoque-movimentacao-filtros" aria-label="Período e produto">
+        <div className="estoque-mov-filtro-produto-top">
+          <label className="estoque-movimentacao-label estoque-mov-filtro-produto-label">
+            Produto (histórico e resumo só deste item)
+            <select
+              className="estoque-input estoque-input--date estoque-input--full"
+              value={produtoId}
+              onChange={(e) => setProdutoId(e.target.value)}
+            >
+              <option value="">Todos os produtos</option>
+              {opcoesProdutoFiltro.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="estoque-mov-presets" role="group" aria-label="Atalhos de período">
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={aplicarHoje}>
             Hoje
@@ -373,21 +371,6 @@ const EstoqueMovimentacao: React.FC<Props> = ({
           <button type="button" className="estoque-btn-primary estoque-btn-small" onClick={aplicarPeriodoDigitado}>
             Aplicar
           </button>
-          <label className="estoque-movimentacao-label">
-            Produto
-            <select
-              className="estoque-input estoque-input--date estoque-input--filtro-prod"
-              value={produtoId}
-              onChange={(e) => setProdutoId(e.target.value)}
-            >
-              <option value="">Todos os produtos</option>
-              {opcoesProdutoFiltro.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
         <div className="estoque-movimentacao-nav-semana">
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={semanaAnterior}>
@@ -420,31 +403,33 @@ const EstoqueMovimentacao: React.FC<Props> = ({
             </div>
           </section>
 
-          <section className="estoque-movimentacao-tabela-wrap" aria-label="Por produto">
-            <h3 className="estoque-subsection-title">Por produto</h3>
-            {resumo.por_produto.length === 0 ? (
-              <p className="estoque-empty-msg">Nenhum movimento neste período.</p>
-            ) : (
-              <table className="estoque-movimentacao-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Entradas</th>
-                    <th>Saídas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resumo.por_produto.map((row) => (
-                    <tr key={row.produto_id}>
-                      <td>{row.nome}</td>
-                      <td>{row.entradas}</td>
-                      <td>{row.saidas}</td>
+          {!produtoId && (
+            <section className="estoque-movimentacao-tabela-wrap" aria-label="Por produto">
+              <h3 className="estoque-subsection-title">Por produto</h3>
+              {resumo.por_produto.length === 0 ? (
+                <p className="estoque-empty-msg">Nenhum movimento neste período.</p>
+              ) : (
+                <table className="estoque-movimentacao-table">
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Entradas</th>
+                      <th>Saídas</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+                  </thead>
+                  <tbody>
+                    {resumo.por_produto.map((row) => (
+                      <tr key={row.produto_id}>
+                        <td>{row.nome}</td>
+                        <td>{row.entradas}</td>
+                        <td>{row.saidas}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+          )}
 
           <section className="estoque-movimentacao-tabela-wrap" aria-label="Movimento por dia">
             <h3 className="estoque-subsection-title">Movimento por dia</h3>
@@ -474,35 +459,7 @@ const EstoqueMovimentacao: React.FC<Props> = ({
 
           <section className="estoque-movimentacao-lista" aria-label="Últimos lançamentos">
             <h3 className="estoque-subsection-title">Últimos lançamentos</h3>
-            {lista.length === 0 ? (
-              <p className="estoque-empty-msg">Nenhum registro.</p>
-            ) : (
-              <ul className="estoque-movimentacao-ul">
-                {lista.map((m) => (
-                  <li key={m.id} className="estoque-movimentacao-li">
-                    <span className="estoque-movimentacao-li-data">{formatarDataHora(m.created_at)}</span>
-                    <span className="estoque-movimentacao-li-prod">{m.produto_nome}</span>
-                    <span className="estoque-movimentacao-li-delta">
-                      {m.diferenca > 0 ? `+${m.diferenca}` : m.diferenca}
-                    </span>
-                    <span className="estoque-movimentacao-li-meta">
-                      {m.quantidade_antes} → {m.quantidade_depois} · {m.tipo || 'ajuste'}
-                      {m.usuario_nome ? ` · ${m.usuario_nome}` : ''} {m.observacao ? ` · ${m.observacao}` : ''}
-                      {m.estornado ? ' · ESTORNADO' : ''}
-                    </span>
-                    {!m.estornado && !m.movimento_estorno_de_id && (
-                      <button
-                        type="button"
-                        className="estoque-btn-secondary estoque-btn-small"
-                        onClick={() => estornarMovimento(m.id)}
-                      >
-                        Estornar
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <EstoqueMovimentosLista lista={lista} onEstornar={estornarMovimento} mostrarEstornar />
           </section>
         </>
       ) : (

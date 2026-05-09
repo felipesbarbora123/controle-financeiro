@@ -124,6 +124,7 @@ const EstoqueShell: React.FC<Props> = ({
             onReload={carregar}
             onIrParaLancar={() => onViewChange('visao')}
             onIrParaMovimentacao={() => onViewChange('movimentacao')}
+            isAdmin={isAdmin}
           />
         )}
         {effectiveView === 'visao' && (

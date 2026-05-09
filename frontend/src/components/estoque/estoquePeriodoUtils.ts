@@ -39,3 +39,28 @@ export function formatarDiaPt(dataIso: string): string {
     year: 'numeric'
   });
 }
+
+export function formatarDataHoraPt(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
+}
+
+/** Converte data vinda da API (ISO ou `Date`) para `YYYY-MM-DD` (evita exibir `…T00:00:00.000Z`). */
+export function normalizaDataIsoDia(v: unknown): string {
+  if (v == null || v === '') return '';
+  const s = String(v);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  try {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  } catch {
+    return s;
+  }
+}
