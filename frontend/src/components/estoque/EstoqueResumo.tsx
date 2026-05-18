@@ -11,6 +11,7 @@ import {
   periodoSemanaSegDom
 } from './estoquePeriodoUtils';
 import EstoqueMovimentosLista, { type EstoqueMovimentoLinha } from './EstoqueMovimentosLista';
+import EstoqueProdutoAutocomplete from './EstoqueProdutoAutocomplete';
 import '../Estoque.css';
 
 function formatAtualizacao(iso?: string | null): string {
@@ -66,6 +67,7 @@ const EstoqueResumo: React.FC<Props> = ({
     setMovFim(f);
     setMovDi(i);
     setMovDf(f);
+    setHistProdutoId('');
   }, [restauranteId]);
 
   const opcoesProdutoHist = useMemo(() => {
@@ -280,26 +282,19 @@ const EstoqueResumo: React.FC<Props> = ({
       <section className="estoque-resumo-mov" aria-label="Histórico por produto">
         <h3 className="estoque-subsection-title">Histórico do produto</h3>
         <p className="estoque-resumo-mov-hint">
-          O que importa aqui é <strong>cada entrada e saída do item no tempo</strong>, não o total geral do restaurante. Escolha o
-          produto e o intervalo (inclui semanas passadas).
+          O que importa aqui é <strong>cada entrada e saída do item no tempo</strong>, não o total geral do restaurante.{' '}
+          <strong>Digite</strong> o nome do produto ou da categoria para buscar e selecione na lista.
         </p>
 
-        <label className="estoque-resumo-hist-prod-label" htmlFor="estoque-resumo-hist-prod">
-          Produto
-        </label>
-        <select
+        <EstoqueProdutoAutocomplete
           id="estoque-resumo-hist-prod"
-          className="estoque-input estoque-resumo-hist-prod-select"
+          label="Produto"
           value={histProdutoId}
-          onChange={(e) => setHistProdutoId(e.target.value)}
-        >
-          <option value="">Selecione um produto…</option>
-          {opcoesProdutoHist.map((o) => (
-            <option key={o.id} value={String(o.id)}>
-              {o.nome} — {o.cat}
-            </option>
-          ))}
-        </select>
+          onChange={setHistProdutoId}
+          opcoes={opcoesProdutoHist}
+          disabled={loading || opcoesProdutoHist.length === 0}
+          placeholder="Ex.: carne, Kraft, bebidas…"
+        />
 
         <div className="estoque-resumo-mov-presets">
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={aplicarPresetHoje}>

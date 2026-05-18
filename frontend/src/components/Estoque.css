@@ -1922,6 +1922,96 @@
   margin-bottom: 0.85rem;
 }
 
+/* Autocomplete de produto */
+.estoque-produto-autocomplete {
+  position: relative;
+  margin-bottom: 0.85rem;
+  max-width: 100%;
+}
+
+.estoque-produto-autocomplete-input-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.estoque-produto-autocomplete-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.estoque-produto-autocomplete-clear {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estoque-produto-autocomplete-clear:active {
+  background: #e2e8f0;
+}
+
+.estoque-produto-autocomplete-list {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: min(16rem, 50vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.estoque-produto-autocomplete-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.estoque-produto-autocomplete-item:hover,
+.estoque-produto-autocomplete-item--active {
+  background: #eff6ff;
+}
+
+.estoque-produto-autocomplete-item-nome {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.estoque-produto-autocomplete-item-cat {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.estoque-produto-autocomplete-empty {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
 .estoque-resumo-dia-ent-sai-wrap {
   overflow-x: auto;
   margin-bottom: 1rem;
