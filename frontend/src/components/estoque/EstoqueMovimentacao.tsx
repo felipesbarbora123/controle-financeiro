@@ -5,6 +5,7 @@ import { movimentarProduto } from '../../lib/estoqueMovimentarApi';
 import type { ResumoMovimentosResponse } from './estoqueTypes';
 import { addDays, formatarDiaPt, isoHoje, normalizaDataIsoDia } from './estoquePeriodoUtils';
 import EstoqueMovimentosLista, { type EstoqueMovimentoLinha } from './EstoqueMovimentosLista';
+import EstoqueProdutoAutocomplete from './EstoqueProdutoAutocomplete';
 import '../Estoque.css';
 
 export type { ResumoMovimentosResponse };
@@ -56,6 +57,16 @@ const EstoqueMovimentacao: React.FC<Props> = ({
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
   }, [produtosCatalogo, resumo?.saldos]);
+
+  const opcoesProdutoAutocomplete = useMemo(
+    () => opcoesProdutoFiltro.map((p) => ({ id: p.id, nome: p.nome })),
+    [opcoesProdutoFiltro]
+  );
+
+  const opcoesLancamentoRapido = useMemo(
+    () => produtosCatalogo.map((p) => ({ id: p.id, nome: p.nome })),
+    [produtosCatalogo]
+  );
 
   const saldoLancamentoRapido = useMemo(() => {
     const id = parseInt(lancProdId, 10);
@@ -261,20 +272,14 @@ const EstoqueMovimentacao: React.FC<Props> = ({
             Saldo atual do item selecionado: <strong>{saldoLancamentoRapido}</strong>
           </p>
           <div className="estoque-lancamento-rapido-grid">
-            <label className="estoque-movimentacao-label">
-              Produto
-              <select
-                className="estoque-input estoque-input--date estoque-input--full"
-                value={lancProdId}
-                onChange={(e) => setLancProdId(e.target.value)}
-              >
-                {produtosCatalogo.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <EstoqueProdutoAutocomplete
+              id="estoque-mov-lanc-prod"
+              label="Produto"
+              value={lancProdId}
+              onChange={setLancProdId}
+              opcoes={opcoesLancamentoRapido}
+              placeholder="Digite o nome do produto…"
+            />
             <label className="estoque-movimentacao-label">
               Tipo
               <select
@@ -322,21 +327,16 @@ const EstoqueMovimentacao: React.FC<Props> = ({
 
       <section className="estoque-movimentacao-filtros" aria-label="Período e produto">
         <div className="estoque-mov-filtro-produto-top">
-          <label className="estoque-movimentacao-label estoque-mov-filtro-produto-label">
-            Produto (histórico e resumo só deste item)
-            <select
-              className="estoque-input estoque-input--date estoque-input--full"
-              value={produtoId}
-              onChange={(e) => setProdutoId(e.target.value)}
-            >
-              <option value="">Todos os produtos</option>
-              {opcoesProdutoFiltro.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+          <EstoqueProdutoAutocomplete
+            id="estoque-mov-filtro-prod"
+            label="Produto (digite para buscar; vazio = todos)"
+            value={produtoId}
+            onChange={setProdutoId}
+            opcoes={opcoesProdutoAutocomplete}
+            permitirVazio
+            disabled={loading}
+            placeholder="Todos os produtos ou digite para filtrar…"
+          />
         </div>
         <div className="estoque-mov-presets" role="group" aria-label="Atalhos de período">
           <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={aplicarHoje}>

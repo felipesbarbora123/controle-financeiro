@@ -1364,6 +1364,7 @@
 /* Visão geral — tabela (telas largas) + cartões (mobile) */
 .estoque-modulo--resumo {
   max-width: min(960px, 100%);
+  overflow: visible;
 }
 
 .estoque-resumo-lead {
@@ -1855,6 +1856,7 @@
   border: 1px solid #e2e8f0;
   background: #fafbfc;
   box-shadow: 0 1px 8px rgba(15, 23, 42, 0.05);
+  overflow: visible;
 }
 
 .estoque-resumo-mov-hint {
@@ -1935,9 +1937,32 @@
   gap: 0.35rem;
 }
 
+.estoque-produto-autocomplete-ajuda {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #64748b;
+}
+
 .estoque-produto-autocomplete-input {
   flex: 1;
   margin-bottom: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #fff;
+}
+
+.estoque-produto-autocomplete-list--portal {
+  position: fixed;
+  max-height: min(16rem, 50vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
 }
 
 .estoque-produto-autocomplete-clear {

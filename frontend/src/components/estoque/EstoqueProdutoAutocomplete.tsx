@@ -1,18 +1,32 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import '../Estoque.css';
 
 export interface EstoqueProdutoOpcao {
   id: number;
   nome: string;
-  cat: string;
+  cat?: string;
 }
 
 function rotuloOpcao(o: EstoqueProdutoOpcao): string {
-  return `${o.nome} — ${o.cat}`;
+  const cat = o.cat?.trim();
+  return cat ? `${o.nome} — ${cat}` : o.nome;
 }
 
 function normalizaBusca(s: string): string {
   return s.trim().toLowerCase();
+}
+
+function acharPorTexto(opcoes: EstoqueProdutoOpcao[], texto: string): EstoqueProdutoOpcao | undefined {
+  const t = texto.trim();
+  if (!t) return undefined;
+  const n = normalizaBusca(t);
+  return opcoes.find(
+    (o) =>
+      rotuloOpcao(o) === t ||
+      o.nome.toLowerCase() === n ||
+      (o.cat && `${o.nome} — ${o.cat}`.toLowerCase() === n)
+  );
 }
 
 interface Props {
@@ -23,6 +37,8 @@ interface Props {
   opcoes: EstoqueProdutoOpcao[];
   placeholder?: string;
   disabled?: boolean;
+  /** Permite limpar a seleção (ex.: “todos os produtos” na movimentação). */
+  permitirVazio?: boolean;
 }
 
 const EstoqueProdutoAutocomplete: React.FC<Props> = ({
@@ -31,8 +47,9 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
   value,
   onChange,
   opcoes,
-  placeholder = 'Digite o nome do produto ou da categoria…',
-  disabled = false
+  placeholder = 'Digite para buscar…',
+  disabled = false,
+  permitirVazio = false
 }) => {
   const autoId = useId();
   const inputId = idProp || `estoque-prod-autocomplete-${autoId}`;
@@ -41,6 +58,7 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [listPos, setListPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -51,16 +69,32 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
 
   const filtradas = useMemo(() => {
     const n = normalizaBusca(query);
-    if (!n) return opcoes.slice(0, 40);
+    if (!n) return opcoes.slice(0, 50);
     return opcoes
-      .filter(
-        (o) =>
+      .filter((o) => {
+        const cat = o.cat?.toLowerCase() ?? '';
+        return (
           o.nome.toLowerCase().includes(n) ||
-          o.cat.toLowerCase().includes(n) ||
+          cat.includes(n) ||
           rotuloOpcao(o).toLowerCase().includes(n)
-      )
-      .slice(0, 40);
+        );
+      })
+      .slice(0, 50);
   }, [opcoes, query]);
+
+  const semOpcoes = opcoes.length === 0;
+  const campoDesabilitado = disabled;
+
+  const atualizarPosLista = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setListPos({
+      top: r.bottom + 4,
+      left: r.left,
+      width: r.width
+    });
+  };
 
   useEffect(() => {
     if (selecionado) {
@@ -75,20 +109,36 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
   }, [query, open]);
 
   useEffect(() => {
+    if (!open) {
+      setListPos(null);
+      return;
+    }
+    atualizarPosLista();
+    const onScroll = () => atualizarPosLista();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open]);
+
+  useEffect(() => {
     const onDocDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (wrapRef.current?.contains(t)) return;
+      const portal = document.getElementById(listId);
+      if (portal?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onDocDown);
     return () => document.removeEventListener('mousedown', onDocDown);
-  }, []);
+  }, [listId]);
 
   const escolher = (o: EstoqueProdutoOpcao) => {
     onChange(String(o.id));
     setQuery(rotuloOpcao(o));
     setOpen(false);
-    inputRef.current?.blur();
   };
 
   const limpar = () => {
@@ -101,14 +151,41 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
   const onInputChange = (texto: string) => {
     setQuery(texto);
     setOpen(true);
-    if (selecionado && texto !== rotuloOpcao(selecionado)) {
-      onChange('');
+    if (!texto.trim()) {
+      if (permitirVazio) onChange('');
+      else if (value) onChange('');
+      return;
     }
+    const match = acharPorTexto(opcoes, texto);
+    if (match) {
+      onChange(String(match.id));
+      return;
+    }
+    if (value) onChange('');
+  };
+
+  const onBlurInput = () => {
+    window.setTimeout(() => {
+      if (!query.trim()) {
+        if (permitirVazio) onChange('');
+        setOpen(false);
+        return;
+      }
+      const match = acharPorTexto(opcoes, query);
+      if (match) {
+        onChange(String(match.id));
+        setQuery(rotuloOpcao(match));
+      } else if (selecionado) {
+        setQuery(rotuloOpcao(selecionado));
+      }
+      setOpen(false);
+    }, 180);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       setOpen(true);
+      atualizarPosLista();
       return;
     }
     if (e.key === 'Escape') {
@@ -135,8 +212,61 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
     }
   };
 
+  const listaPortal =
+    open && !campoDesabilitado && listPos && !semOpcoes
+      ? createPortal(
+          <ul
+            id={listId}
+            className="estoque-produto-autocomplete-list estoque-produto-autocomplete-list--portal"
+            role="listbox"
+            style={{
+              position: 'fixed',
+              top: listPos.top,
+              left: listPos.left,
+              width: listPos.width,
+              zIndex: 10000
+            }}
+          >
+            {filtradas.length === 0 ? (
+              <li className="estoque-produto-autocomplete-empty" role="option" aria-selected={false}>
+                Nenhum produto encontrado.
+              </li>
+            ) : (
+              filtradas.map((o, i) => (
+                <li key={o.id} role="presentation">
+                  <button
+                    type="button"
+                    id={`${inputId}-opt-${o.id}`}
+                    role="option"
+                    aria-selected={value === String(o.id)}
+                    className={`estoque-produto-autocomplete-item ${
+                      i === highlight ? 'estoque-produto-autocomplete-item--active' : ''
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => escolher(o)}
+                    onMouseEnter={() => setHighlight(i)}
+                  >
+                    <span className="estoque-produto-autocomplete-item-nome">{o.nome}</span>
+                    {o.cat?.trim() ? (
+                      <span className="estoque-produto-autocomplete-item-cat">{o.cat}</span>
+                    ) : null}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>,
+          document.body
+        )
+      : null;
+
+  const podeLimpar = permitirVazio ? query.length > 0 || value !== '' : value !== '';
+
   return (
-    <div className="estoque-produto-autocomplete" ref={wrapRef}>
+    <div
+      className="estoque-produto-autocomplete"
+      ref={wrapRef}
+      data-estoque-autocomplete="v2"
+    >
       <label className="estoque-resumo-hist-prod-label" htmlFor={inputId}>
         {label}
       </label>
@@ -144,64 +274,48 @@ const EstoqueProdutoAutocomplete: React.FC<Props> = ({
         <input
           ref={inputRef}
           id={inputId}
-          type="search"
+          type="text"
+          inputMode="search"
+          enterKeyHint="search"
           className="estoque-input estoque-produto-autocomplete-input"
-          placeholder={placeholder}
+          placeholder={
+            campoDesabilitado
+              ? 'Carregando…'
+              : semOpcoes
+                ? 'Cadastre produtos na aba Produtos'
+                : placeholder
+          }
           value={query}
-          disabled={disabled || opcoes.length === 0}
+          disabled={campoDesabilitado}
           autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={
-            open && filtradas.length > 0 ? `${inputId}-opt-${filtradas[highlight].id}` : undefined
-          }
           onChange={(e) => onInputChange(e.target.value)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            if (semOpcoes) return;
+            setOpen(true);
+            atualizarPosLista();
+          }}
+          onBlur={onBlurInput}
           onKeyDown={onKeyDown}
         />
-        {value && !disabled && (
+        {podeLimpar && !campoDesabilitado && (
           <button
             type="button"
             className="estoque-produto-autocomplete-clear"
             onClick={limpar}
-            aria-label="Limpar produto selecionado"
+            aria-label="Limpar produto"
             title="Limpar"
           >
             ×
           </button>
         )}
       </div>
-      {open && !disabled && opcoes.length > 0 && (
-        <ul id={listId} className="estoque-produto-autocomplete-list" role="listbox">
-          {filtradas.length === 0 ? (
-            <li className="estoque-produto-autocomplete-empty" role="option" aria-selected={false}>
-              Nenhum produto encontrado.
-            </li>
-          ) : (
-            filtradas.map((o, i) => (
-              <li key={o.id} role="presentation">
-                <button
-                  type="button"
-                  id={`${inputId}-opt-${o.id}`}
-                  role="option"
-                  aria-selected={value === String(o.id)}
-                  className={`estoque-produto-autocomplete-item ${
-                    i === highlight ? 'estoque-produto-autocomplete-item--active' : ''
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => escolher(o)}
-                  onMouseEnter={() => setHighlight(i)}
-                >
-                  <span className="estoque-produto-autocomplete-item-nome">{o.nome}</span>
-                  <span className="estoque-produto-autocomplete-item-cat">{o.cat}</span>
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      )}
+      {listaPortal}
     </div>
   );
 };

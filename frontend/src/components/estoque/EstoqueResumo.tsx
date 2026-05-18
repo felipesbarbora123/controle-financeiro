@@ -288,11 +288,11 @@ const EstoqueResumo: React.FC<Props> = ({
 
         <EstoqueProdutoAutocomplete
           id="estoque-resumo-hist-prod"
-          label="Produto"
+          label="Produto (digite para buscar)"
           value={histProdutoId}
           onChange={setHistProdutoId}
           opcoes={opcoesProdutoHist}
-          disabled={loading || opcoesProdutoHist.length === 0}
+          disabled={loading}
           placeholder="Ex.: carne, Kraft, bebidas…"
         />
 
