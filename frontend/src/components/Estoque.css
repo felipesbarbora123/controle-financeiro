@@ -688,6 +688,59 @@
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
 }
 
+.estoque-replicar-fieldset {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.estoque-replicar-legend {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+  padding: 0 0.25rem;
+}
+
+.estoque-replicar-checklist {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.estoque-replicar-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.estoque-replicar-check--inline {
+  margin: 0.5rem 0;
+}
+
+.estoque-replicar-check-meta {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.estoque-replicar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.estoque-replicar-count {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
 .estoque-subsection-title {
   font-size: 1rem;
   margin: 0 0 0.65rem;

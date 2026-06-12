@@ -958,6 +958,260 @@ app.delete('/api/estoque/produtos/:id', authenticateToken, requireAdmin, async (
   }
 });
 
+async function resolverCategoriaDestinoReplicar(client, destinoId, categoriaNome, categoriaOrdem, catMap, criarCats) {
+  const nomeNorm = String(categoriaNome).trim();
+  if (catMap.has(nomeNorm)) {
+    return catMap.get(nomeNorm);
+  }
+  const existing = await client.query(
+    'SELECT id FROM estoque_categorias WHERE restaurante_id = $1 AND nome = $2',
+    [destinoId, nomeNorm]
+  );
+  if (existing.rows.length > 0) {
+    const id = existing.rows[0].id;
+    catMap.set(nomeNorm, id);
+    return id;
+  }
+  if (!criarCats) {
+    return null;
+  }
+  try {
+    const ins = await client.query(
+      'INSERT INTO estoque_categorias (restaurante_id, nome, ordem) VALUES ($1, $2, $3) RETURNING id',
+      [destinoId, nomeNorm, categoriaOrdem !== undefined && categoriaOrdem !== null ? categoriaOrdem : 0]
+    );
+    const id = ins.rows[0].id;
+    catMap.set(nomeNorm, id);
+    return id;
+  } catch (err) {
+    if (err.code === '23505') {
+      const r2 = await client.query(
+        'SELECT id FROM estoque_categorias WHERE restaurante_id = $1 AND nome = $2',
+        [destinoId, nomeNorm]
+      );
+      if (r2.rows.length === 0) throw err;
+      const id = r2.rows[0].id;
+      catMap.set(nomeNorm, id);
+      return id;
+    }
+    throw err;
+  }
+}
+
+app.post('/api/estoque/produtos/replicar', authenticateToken, requireAdmin, async (req, res) => {
+  const {
+    origem_restaurante_id,
+    destino_restaurante_ids,
+    produto_ids,
+    criar_categorias_ausentes,
+    copiar_quantidade
+  } = req.body || {};
+
+  const origemId = parseInt(origem_restaurante_id, 10);
+  if (Number.isNaN(origemId)) {
+    return res.status(400).json({ error: 'origem_restaurante_id inválido' });
+  }
+  if (!Array.isArray(destino_restaurante_ids) || destino_restaurante_ids.length === 0) {
+    return res.status(400).json({ error: 'Informe ao menos um restaurante de destino.' });
+  }
+
+  const destinos = [
+    ...new Set(
+      destino_restaurante_ids
+        .map((id) => parseInt(id, 10))
+        .filter((id) => !Number.isNaN(id) && id !== origemId)
+    )
+  ];
+  if (destinos.length === 0) {
+    return res.status(400).json({ error: 'Informe restaurantes de destino válidos (diferentes da origem).' });
+  }
+
+  const criarCats = criar_categorias_ausentes !== false;
+  const copiarQtd = copiar_quantidade === true;
+
+  const restCheck = await pool.query('SELECT id FROM restaurantes WHERE id = $1', [origemId]);
+  if (restCheck.rows.length === 0) {
+    return res.status(404).json({ error: 'Restaurante de origem não encontrado.' });
+  }
+
+  const destCheck = await pool.query('SELECT id FROM restaurantes WHERE id = ANY($1::int[])', [destinos]);
+  if (destCheck.rows.length !== destinos.length) {
+    return res.status(400).json({ error: 'Um ou mais restaurantes de destino não existem.' });
+  }
+
+  let prodFilter = '';
+  const prodParams = [origemId];
+  if (Array.isArray(produto_ids) && produto_ids.length > 0) {
+    const ids = produto_ids.map((id) => parseInt(id, 10)).filter((id) => !Number.isNaN(id));
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'produto_ids inválidos.' });
+    }
+    prodFilter = ' AND p.id = ANY($2::int[])';
+    prodParams.push(ids);
+  }
+
+  const sqlProdutosCompleto = `SELECT p.id, p.restaurante_id, p.nome, p.unidade, p.quantidade,
+         p.quantidade_critica, p.foto_url, c.nome AS categoria_nome, c.ordem AS categoria_ordem
+       FROM estoque_produtos p
+       INNER JOIN estoque_categorias c ON c.id = p.categoria_id
+       WHERE p.restaurante_id = $1${prodFilter}
+       ORDER BY c.ordem ASC, c.nome ASC, p.nome ASC`;
+  const sqlProdutosLegado = `SELECT p.id, p.restaurante_id, p.nome, p.unidade, p.quantidade,
+         c.nome AS categoria_nome, c.ordem AS categoria_ordem
+       FROM estoque_produtos p
+       INNER JOIN estoque_categorias c ON c.id = p.categoria_id
+       WHERE p.restaurante_id = $1${prodFilter}
+       ORDER BY c.ordem ASC, c.nome ASC, p.nome ASC`;
+
+  let prodResult;
+  try {
+    prodResult = await pool.query(sqlProdutosCompleto, prodParams);
+  } catch (err) {
+    if (err.code === '42703') {
+      prodResult = await pool.query(sqlProdutosLegado, prodParams);
+    } else {
+      throw err;
+    }
+  }
+
+  const produtosOrigem = prodResult.rows;
+  if (produtosOrigem.length === 0) {
+    return res.status(400).json({ error: 'Nenhum produto encontrado na origem para replicar.' });
+  }
+
+  const resumo = {
+    criados: 0,
+    ignorados_duplicata: 0,
+    ignorados_categoria_ausente: 0,
+    categorias_criadas: 0,
+    detalhes: []
+  };
+
+  const client = await pool.connect();
+  try {
+    for (const destinoId of destinos) {
+      await client.query('BEGIN');
+      const catMap = new Map();
+      const catsDest = await client.query(
+        'SELECT id, nome FROM estoque_categorias WHERE restaurante_id = $1',
+        [destinoId]
+      );
+      catsDest.rows.forEach((c) => catMap.set(String(c.nome).trim(), c.id));
+      const catsAntes = catMap.size;
+
+      for (const src of produtosOrigem) {
+        const categoriaId = await resolverCategoriaDestinoReplicar(
+          client,
+          destinoId,
+          src.categoria_nome,
+          src.categoria_ordem,
+          catMap,
+          criarCats
+        );
+        if (!categoriaId) {
+          resumo.ignorados_categoria_ausente += 1;
+          resumo.detalhes.push({
+            destino_restaurante_id: destinoId,
+            produto_origem_id: src.id,
+            produto_nome: src.nome,
+            status: 'categoria_ausente'
+          });
+          continue;
+        }
+
+        const un = src.unidade && String(src.unidade).trim() !== '' ? String(src.unidade).trim().slice(0, 20) : 'un';
+        const qtd = copiarQtd ? Math.max(0, Math.round(Number(src.quantidade)) || 0) : 0;
+        const critica =
+          src.quantidade_critica !== undefined && src.quantidade_critica !== null
+            ? Math.max(0, Math.round(Number(src.quantidade_critica)) || 0)
+            : 0;
+        let fotoVal = null;
+        if (src.foto_url != null && String(src.foto_url).trim() !== '') {
+          const fs = String(src.foto_url).trim();
+          if (fs.length <= MAX_ESTOQUE_FOTO_URL_LEN) {
+            fotoVal = fs;
+          }
+        }
+
+        try {
+          const ins = await client.query(
+            `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade, quantidade_critica, foto_url)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id`,
+            [destinoId, categoriaId, String(src.nome).trim(), un, qtd, critica, fotoVal]
+          );
+          const novoId = ins.rows[0].id;
+          if (qtd > 0) {
+            await inserirMovimentoEstoque(client, {
+              produtoId: novoId,
+              restauranteId: destinoId,
+              usuarioId: req.user.id,
+              antes: 0,
+              depois: qtd
+            });
+          }
+          resumo.criados += 1;
+          resumo.detalhes.push({
+            destino_restaurante_id: destinoId,
+            produto_origem_id: src.id,
+            produto_novo_id: novoId,
+            produto_nome: src.nome,
+            status: 'criado'
+          });
+        } catch (err) {
+          if (err.code === '23505') {
+            resumo.ignorados_duplicata += 1;
+            resumo.detalhes.push({
+              destino_restaurante_id: destinoId,
+              produto_origem_id: src.id,
+              produto_nome: src.nome,
+              status: 'duplicata'
+            });
+          } else if (err.code === '42703') {
+            const insLeg = await client.query(
+              `INSERT INTO estoque_produtos (restaurante_id, categoria_id, nome, unidade, quantidade)
+               VALUES ($1, $2, $3, $4, $5)
+               RETURNING id`,
+              [destinoId, categoriaId, String(src.nome).trim(), un, qtd]
+            );
+            const novoId = insLeg.rows[0].id;
+            if (qtd > 0) {
+              await inserirMovimentoEstoque(client, {
+                produtoId: novoId,
+                restauranteId: destinoId,
+                usuarioId: req.user.id,
+                antes: 0,
+                depois: qtd
+              });
+            }
+            resumo.criados += 1;
+            resumo.detalhes.push({
+              destino_restaurante_id: destinoId,
+              produto_origem_id: src.id,
+              produto_novo_id: novoId,
+              produto_nome: src.nome,
+              status: 'criado'
+            });
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      resumo.categorias_criadas += Math.max(0, catMap.size - catsAntes);
+      await client.query('COMMIT');
+    }
+
+    res.json(resumo);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao replicar produtos:', error);
+    res.status(500).json({ error: 'Erro ao replicar produtos' });
+  } finally {
+    client.release();
+  }
+});
+
 // Lançamento explícito de entrada/saída (quantidade)
 app.post('/api/estoque/produtos/:id/movimentar', authenticateToken, async (req, res) => {
   const produtoId = parseInt(req.params.id, 10);

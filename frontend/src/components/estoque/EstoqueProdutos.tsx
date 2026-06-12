@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { EstoqueCategoria, EstoqueProduto } from './estoqueTypes';
@@ -6,6 +6,18 @@ import { UNIDADES_SUGERIDAS } from './estoqueTypes';
 import { saldoIntEstoque } from './estoqueProdutoUtils';
 import { IconTrash } from './EstoqueIcons';
 import '../Estoque.css';
+
+interface RestauranteOption {
+  id: number;
+  nome: string;
+}
+
+interface ReplicarResponse {
+  criados: number;
+  ignorados_duplicata: number;
+  ignorados_categoria_ausente: number;
+  categorias_criadas: number;
+}
 
 const MAX_FOTO_FILE_BYTES = 280 * 1024;
 
@@ -57,6 +69,110 @@ const EstoqueProdutos: React.FC<Props> = ({
   const [editCritica, setEditCritica] = useState('');
   const [editFoto, setEditFoto] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+
+  const [restaurantes, setRestaurantes] = useState<RestauranteOption[]>([]);
+  const [replicarProdIds, setReplicarProdIds] = useState<number[]>([]);
+  const [replicarDestIds, setReplicarDestIds] = useState<number[]>([]);
+  const [replicarCriarCats, setReplicarCriarCats] = useState(true);
+  const [replicarCopiarQtd, setReplicarCopiarQtd] = useState(false);
+  const [replicando, setReplicando] = useState(false);
+
+  const todosProdutos = useMemo(
+    () =>
+      categorias.flatMap((c) =>
+        (c.produtos || []).map((p) => ({ ...p, categoria_nome: c.nome }))
+      ),
+    [categorias]
+  );
+
+  const outrosRestaurantes = useMemo(
+    () => restaurantes.filter((r) => r.id !== restauranteId),
+    [restaurantes, restauranteId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get<RestauranteOption[]>(`${API_URL}/restaurantes`)
+      .then(({ data }) => {
+        if (!cancelled) setRestaurantes(data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setRestaurantes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleReplicarProd = (id: number) => {
+    setReplicarProdIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleReplicarDest = (id: number) => {
+    setReplicarDestIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const selecionarTodosProdutos = () => {
+    setReplicarProdIds(todosProdutos.map((p) => p.id));
+  };
+
+  const selecionarTodosDestinos = () => {
+    setReplicarDestIds(outrosRestaurantes.map((r) => r.id));
+  };
+
+  const replicarProdutos = async () => {
+    if (replicarDestIds.length === 0) {
+      onMessage?.('Selecione ao menos um restaurante de destino.');
+      return;
+    }
+    if (todosProdutos.length === 0) {
+      onMessage?.('Não há produtos para replicar.');
+      return;
+    }
+
+    const prodIds = replicarProdIds.length > 0 ? replicarProdIds : todosProdutos.map((p) => p.id);
+    const qtdLabel = prodIds.length === todosProdutos.length ? 'todos os produtos' : `${prodIds.length} produto(s)`;
+    const destLabel = replicarDestIds
+      .map((id) => outrosRestaurantes.find((r) => r.id === id)?.nome || `#${id}`)
+      .join(', ');
+
+    if (
+      !window.confirm(
+        `Replicar ${qtdLabel} para: ${destLabel}?\n\nProdutos já existentes (mesmo nome na categoria) serão ignorados. Estoque inicial será ${replicarCopiarQtd ? 'copiado da origem' : 'zero'}.`
+      )
+    ) {
+      return;
+    }
+
+    onMessage?.(null);
+    setReplicando(true);
+    try {
+      const body: Record<string, unknown> = {
+        origem_restaurante_id: restauranteId,
+        destino_restaurante_ids: replicarDestIds,
+        criar_categorias_ausentes: replicarCriarCats,
+        copiar_quantidade: replicarCopiarQtd
+      };
+      if (replicarProdIds.length > 0) {
+        body.produto_ids = replicarProdIds;
+      }
+      const { data } = await axios.post<ReplicarResponse>(`${API_URL}/estoque/produtos/replicar`, body);
+      const partes = [`${data.criados} produto(s) criado(s)`];
+      if (data.categorias_criadas > 0) partes.push(`${data.categorias_criadas} categoria(s) criada(s)`);
+      if (data.ignorados_duplicata > 0) partes.push(`${data.ignorados_duplicata} ignorado(s) (já existiam)`);
+      if (data.ignorados_categoria_ausente > 0) {
+        partes.push(`${data.ignorados_categoria_ausente} ignorado(s) (categoria ausente)`);
+      }
+      onMessage?.(`Replicação concluída: ${partes.join('; ')}.`);
+      setReplicarProdIds([]);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: string } } };
+      onMessage?.(ax.response?.data?.error || 'Erro ao replicar produtos.');
+    } finally {
+      setReplicando(false);
+    }
+  };
 
   const lerArquivoComoDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -298,6 +414,102 @@ const EstoqueProdutos: React.FC<Props> = ({
           </button>
         </form>
       </section>
+
+      {todosProdutos.length > 0 && outrosRestaurantes.length > 0 && (
+        <section className="estoque-admin-screen-card" aria-label="Replicar produtos">
+          <h3 className="estoque-subsection-title">Replicar para outros restaurantes</h3>
+          <p className="estoque-hint-foto">
+            Copia o cadastro (nome, unidade, foto, quantidade crítica) deste restaurante para as lojas selecionadas.
+            Categorias são associadas pelo nome. Se nenhum produto estiver marcado, replica todos.
+          </p>
+
+          <fieldset className="estoque-replicar-fieldset">
+            <legend className="estoque-replicar-legend">Produtos a replicar</legend>
+            <div className="estoque-replicar-actions">
+              <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={selecionarTodosProdutos}>
+                Selecionar todos
+              </button>
+              <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={() => setReplicarProdIds([])}>
+                Limpar seleção
+              </button>
+              <span className="estoque-replicar-count">
+                {replicarProdIds.length > 0
+                  ? `${replicarProdIds.length} selecionado(s)`
+                  : `Todos (${todosProdutos.length})`}
+              </span>
+            </div>
+            <ul className="estoque-replicar-checklist">
+              {todosProdutos.map((p) => (
+                <li key={p.id}>
+                  <label className="estoque-replicar-check">
+                    <input
+                      type="checkbox"
+                      checked={replicarProdIds.includes(p.id)}
+                      onChange={() => toggleReplicarProd(p.id)}
+                    />
+                    <span>
+                      {p.nome}
+                      <span className="estoque-replicar-check-meta"> · {p.categoria_nome}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+
+          <fieldset className="estoque-replicar-fieldset">
+            <legend className="estoque-replicar-legend">Restaurantes de destino</legend>
+            <div className="estoque-replicar-actions">
+              <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={selecionarTodosDestinos}>
+                Selecionar todos
+              </button>
+              <button type="button" className="estoque-btn-secondary estoque-btn-small" onClick={() => setReplicarDestIds([])}>
+                Limpar seleção
+              </button>
+            </div>
+            <ul className="estoque-replicar-checklist">
+              {outrosRestaurantes.map((r) => (
+                <li key={r.id}>
+                  <label className="estoque-replicar-check">
+                    <input
+                      type="checkbox"
+                      checked={replicarDestIds.includes(r.id)}
+                      onChange={() => toggleReplicarDest(r.id)}
+                    />
+                    <span>{r.nome}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+
+          <label className="estoque-replicar-check estoque-replicar-check--inline">
+            <input
+              type="checkbox"
+              checked={replicarCriarCats}
+              onChange={(e) => setReplicarCriarCats(e.target.checked)}
+            />
+            <span>Criar categorias ausentes nos restaurantes de destino</span>
+          </label>
+          <label className="estoque-replicar-check estoque-replicar-check--inline">
+            <input
+              type="checkbox"
+              checked={replicarCopiarQtd}
+              onChange={(e) => setReplicarCopiarQtd(e.target.checked)}
+            />
+            <span>Copiar quantidade em estoque da origem (padrão: iniciar com zero)</span>
+          </label>
+
+          <button
+            type="button"
+            className="estoque-btn-primary estoque-btn-block"
+            disabled={replicando || replicarDestIds.length === 0}
+            onClick={replicarProdutos}
+          >
+            {replicando ? 'Replicando…' : 'Replicar produtos'}
+          </button>
+        </section>
+      )}
 
       <section className="estoque-admin-screen-card" aria-label="Produtos cadastrados">
         <h3 className="estoque-subsection-title">Produtos cadastrados</h3>
