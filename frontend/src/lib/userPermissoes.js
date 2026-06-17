@@ -6,6 +6,19 @@ export function permissoesUsuario(user) {
   if (user.is_admin) {
     return { financeiro: true, estoque: true, estoqueSimplificado: true };
   }
+
+  const temCamposModulo =
+    user.modulo_financeiro !== undefined ||
+    user.modulo_estoque !== undefined ||
+    user.modulo_estoque_simplificado !== undefined;
+
+  if (!temCamposModulo) {
+    if (user.somente_estoque) {
+      return { financeiro: false, estoque: true, estoqueSimplificado: false };
+    }
+    return { financeiro: true, estoque: false, estoqueSimplificado: false };
+  }
+
   return {
     financeiro: !!user.modulo_financeiro,
     estoque: !!user.modulo_estoque,

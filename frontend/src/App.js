@@ -76,6 +76,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const atualizarPermissoes = async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/verify`);
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } catch {
+        /* token inválido tratado pelo interceptor */
+      }
+    };
+    window.addEventListener('focus', atualizarPermissoes);
+    return () => window.removeEventListener('focus', atualizarPermissoes);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     if (isAuthenticated) {
       carregarRestaurantes();
     }
@@ -311,9 +326,11 @@ function App() {
   const perms = permissoesUsuario(user);
   const isAdmin = !!user?.is_admin;
   const acessoFinanceiro = perms.financeiro;
-  const acessoEstoque = perms.estoque || perms.estoqueSimplificado;
+  const acessoEstoque = perms.estoque;
+  const acessoEstoqueSimplificado = perms.estoqueSimplificado;
+  const acessoQualquerEstoque = acessoEstoque || acessoEstoqueSimplificado;
   const tituloApp =
-    !acessoFinanceiro && acessoEstoque ? 'Estoque' : 'Controle Financeiro - Multi Restaurante';
+    !acessoFinanceiro && acessoQualquerEstoque ? 'Estoque' : 'Controle Financeiro - Multi Restaurante';
 
   if (loading && acessoFinanceiro) {
     return (
@@ -429,10 +446,23 @@ function App() {
             {acessoEstoque && (
               <button
                 type="button"
-                onClick={() => irParaEstoque(estoqueViewInicial(user))}
-                className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
+                onClick={() => irParaEstoque('resumo')}
+                className={
+                  telaAtual === 'estoque' && estoqueView !== 'diario' ? 'nav-tab active' : 'nav-tab'
+                }
               >
-                {perms.estoque ? 'Estoque' : 'Lançamento diário'}
+                Estoque
+              </button>
+            )}
+            {acessoEstoqueSimplificado && (
+              <button
+                type="button"
+                onClick={() => irParaEstoque('diario')}
+                className={
+                  telaAtual === 'estoque' && estoqueView === 'diario' ? 'nav-tab active' : 'nav-tab'
+                }
+              >
+                Lançamento diário
               </button>
             )}
           </div>
@@ -440,7 +470,7 @@ function App() {
             telaAtual === 'estoque' ||
             telaAtual === 'inicio' ||
             telaAtual === 'relatorios' ||
-            (acessoEstoque && !acessoFinanceiro)) &&
+            (acessoQualquerEstoque && !acessoFinanceiro)) &&
             restaurantes.length > 0 && (
             <select
               value={restauranteSelecionado || ''}
@@ -496,7 +526,7 @@ function App() {
               setTelaAtual('permissoes');
             }}
           />
-        ) : telaAtual === 'estoque' && acessoEstoque ? (
+        ) : telaAtual === 'estoque' && acessoQualquerEstoque ? (
           restaurantes.length === 0 ? (
             <div className="empty-state">
               <p>Nenhum restaurante disponível. Peça ao administrador para cadastrar um restaurante.</p>

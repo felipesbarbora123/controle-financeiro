@@ -123,11 +123,15 @@ const EstoqueShell: React.FC<Props> = ({
     if (item.adminOnly && !isAdmin) return false;
     if (item.requer === 'estoque' && !modulos.estoque) return false;
     if (item.requer === 'simplificado' && !modulos.simplificado) return false;
+    if (item.id === 'diario' && modulos.estoque) return false;
     return true;
   });
 
+  const mostrarSubnav = modulos.estoque && visibleNav.length > 0;
+
   return (
     <div className="estoque-shell">
+      {mostrarSubnav && (
       <nav className="estoque-subnav" aria-label="Menu do estoque">
         <div className="estoque-subnav-scroll">
           {visibleNav.map((item) => (
@@ -142,6 +146,7 @@ const EstoqueShell: React.FC<Props> = ({
           ))}
         </div>
       </nav>
+      )}
 
       <div className="estoque-shell-content" id="estoque-lancamento-panel">
         {effectiveView === 'diario' && modulos.simplificado && (
@@ -167,9 +172,6 @@ const EstoqueShell: React.FC<Props> = ({
             onMessage={onMessage}
             modoOperador={!isAdmin}
           />
-        )}
-        {effectiveView === 'diario' && (
-          <EstoqueLancamentoDiario restauranteId={restauranteId} onMessage={onMessage} />
         )}
         {effectiveView === 'movimentacao' && modulos.estoque && (
           <EstoqueMovimentacao
