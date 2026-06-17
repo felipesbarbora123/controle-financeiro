@@ -7,7 +7,13 @@ import CadastroRestaurantes from './components/CadastroRestaurantes';
 import Relatorios from './components/Relatorios';
 import EstoqueShell from './components/estoque/EstoqueShell';
 import AdminDashboard from './components/AdminDashboard';
-import AdminUsuariosEstoque from './components/AdminUsuariosEstoque';
+import AdminPermissoesUsuarios from './components/AdminPermissoesUsuarios';
+import {
+  estoqueViewInicial,
+  permissoesUsuario,
+  telaInicialUsuario,
+  usuarioTemAlgumModulo
+} from './lib/userPermissoes';
 import { API_URL } from './config';
 
 // Configurar axios para incluir token em todas as requisições
@@ -28,7 +34,7 @@ axios.interceptors.request.use(
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.reload();
@@ -49,14 +55,19 @@ function App() {
   const [telaAtual, setTelaAtual] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (u.somente_estoque) return 'estoque';
-      if (u.is_admin) return 'inicio';
-      return 'gastos';
+      return telaInicialUsuario(u);
     } catch {
       return 'gastos';
     }
-  }); // 'inicio' | 'gastos' | 'relatorios' | 'restaurantes' | 'estoque'
-  const [estoqueView, setEstoqueView] = useState('resumo'); // resumo | visao | categorias | produtos | movimentacao
+  });
+  const [estoqueView, setEstoqueView] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      return estoqueViewInicial(u);
+    } catch {
+      return 'resumo';
+    }
+  });
   const [msgEstoque, setMsgEstoque] = useState(null);
   const [estoqueMovPresetPeriodo, setEstoqueMovPresetPeriodo] = useState(null);
 
@@ -70,34 +81,33 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  // Perfil somente estoque: abrir direto no módulo de estoque
   useEffect(() => {
-    if (user?.somente_estoque) {
+    if (!user) return;
+    const p = permissoesUsuario(user);
+    if (!p.financeiro && !user.is_admin && (p.estoque || p.estoqueSimplificado)) {
       setTelaAtual('estoque');
-      setEstoqueView('resumo');
+      setEstoqueView(estoqueViewInicial(user));
     }
   }, [user]);
 
   useEffect(() => {
-    if (telaAtual === 'inicio' && user && !user.is_admin && !user.somente_estoque) {
-      setTelaAtual('gastos');
+    if (telaAtual === 'inicio' && user && !user.is_admin) {
+      setTelaAtual(telaInicialUsuario(user));
     }
   }, [telaAtual, user]);
 
-  // Perfil somente estoque não carrega gastos — liberar tela de loading
   useEffect(() => {
-    if (isAuthenticated && user?.somente_estoque) {
+    if (isAuthenticated && user && !permissoesUsuario(user).financeiro && !user.is_admin) {
       setLoading(false);
     }
   }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (isAuthenticated && restaurantes.length > 0) {
-      // Selecionar primeiro restaurante se nenhum estiver selecionado
       if (!restauranteSelecionado) {
         setRestauranteSelecionado(restaurantes[0].id);
       }
-      if (user && !user.somente_estoque) {
+      if (user && permissoesUsuario(user).financeiro) {
         carregarGastos();
       }
     }
@@ -123,7 +133,9 @@ function App() {
 
     try {
       const response = await axios.get(`${API_URL}/verify`);
-      setUser(response.data.user);
+      const u = response.data.user;
+      setUser(u);
+      localStorage.setItem('user', JSON.stringify(u));
       setIsAuthenticated(true);
     } catch (err) {
       localStorage.removeItem('token');
@@ -136,14 +148,8 @@ function App() {
   const handleLogin = (userData, token) => {
     setUser(userData);
     setIsAuthenticated(true);
-    if (userData.somente_estoque) {
-      setTelaAtual('estoque');
-      setEstoqueView('resumo');
-    } else if (userData.is_admin) {
-      setTelaAtual('inicio');
-    } else {
-      setTelaAtual('gastos');
-    }
+    setTelaAtual(telaInicialUsuario(userData));
+    setEstoqueView(estoqueViewInicial(userData));
   };
 
   const handleLogout = () => {
@@ -302,10 +308,14 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  const somenteEstoque = !!user?.somente_estoque;
+  const perms = permissoesUsuario(user);
   const isAdmin = !!user?.is_admin;
+  const acessoFinanceiro = perms.financeiro;
+  const acessoEstoque = perms.estoque || perms.estoqueSimplificado;
+  const tituloApp =
+    !acessoFinanceiro && acessoEstoque ? 'Estoque' : 'Controle Financeiro - Multi Restaurante';
 
-  if (loading && !somenteEstoque) {
+  if (loading && acessoFinanceiro) {
     return (
       <div className="app">
         <div className="loading">Carregando...</div>
@@ -333,8 +343,11 @@ function App() {
   };
 
   const irParaEstoque = (view = 'resumo', opts = {}) => {
-    const ok = ['resumo', 'visao', 'categorias', 'produtos', 'movimentacao'].includes(view);
-    setEstoqueView(ok ? view : 'resumo');
+    const viewsOk = ['resumo', 'diario', 'visao', 'categorias', 'produtos', 'movimentacao'];
+    let v = viewsOk.includes(view) ? view : 'resumo';
+    if (v === 'diario' && !perms.estoqueSimplificado) v = perms.estoque ? 'resumo' : 'diario';
+    if (v !== 'diario' && !perms.estoque) v = 'diario';
+    setEstoqueView(v);
     if (opts?.periodoHoje && view === 'movimentacao') {
       const h = hojeIso();
       setEstoqueMovPresetPeriodo({
@@ -360,14 +373,14 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div>
-          <h1>{somenteEstoque ? 'Estoque' : 'Controle Financeiro - Multi Restaurante'}</h1>
+          <h1>{tituloApp}</h1>
           {user && (
             <p className="user-info">Olá, {user.nome}!</p>
           )}
         </div>
         <div className="header-actions">
           <div className="nav-tabs nav-tabs--scroll">
-            {!somenteEstoque && isAdmin && (
+            {isAdmin && (
               <button
                 type="button"
                 onClick={() => setTelaAtual('inicio')}
@@ -376,7 +389,7 @@ function App() {
                 Início
               </button>
             )}
-            {!somenteEstoque && (
+            {acessoFinanceiro && (
               <>
                 <button
                   type="button"
@@ -399,31 +412,35 @@ function App() {
                 >
                   Restaurantes
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTelaAtual('usuarios_estoque');
-                    setError(null);
-                  }}
-                  className={telaAtual === 'usuarios_estoque' ? 'nav-tab active' : 'nav-tab'}
-                >
-                  Usuários estoque
-                </button>
               </>
             )}
-            <button
-              type="button"
-              onClick={() => irParaEstoque('resumo')}
-              className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
-            >
-              Estoque
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTelaAtual('permissoes');
+                  setError(null);
+                }}
+                className={telaAtual === 'permissoes' ? 'nav-tab active' : 'nav-tab'}
+              >
+                Permissões
+              </button>
+            )}
+            {acessoEstoque && (
+              <button
+                type="button"
+                onClick={() => irParaEstoque(estoqueViewInicial(user))}
+                className={telaAtual === 'estoque' ? 'nav-tab active' : 'nav-tab'}
+              >
+                {perms.estoque ? 'Estoque' : 'Lançamento diário'}
+              </button>
+            )}
           </div>
           {(telaAtual === 'gastos' ||
             telaAtual === 'estoque' ||
             telaAtual === 'inicio' ||
             telaAtual === 'relatorios' ||
-            somenteEstoque) &&
+            (acessoEstoque && !acessoFinanceiro)) &&
             restaurantes.length > 0 && (
             <select
               value={restauranteSelecionado || ''}
@@ -437,7 +454,7 @@ function App() {
               ))}
             </select>
           )}
-          {telaAtual === 'gastos' && !somenteEstoque && (
+          {telaAtual === 'gastos' && acessoFinanceiro && (
             <button type="button" onClick={carregarGastos} className="btn-refresh">
               Atualizar
             </button>
@@ -460,7 +477,11 @@ function App() {
       )}
 
       <main className="app-main">
-        {telaAtual === 'inicio' && isAdmin && !somenteEstoque ? (
+        {!usuarioTemAlgumModulo(user) ? (
+          <div className="empty-state">
+            <p>Seu usuário não tem módulos liberados. Peça ao administrador para configurar em Permissões.</p>
+          </div>
+        ) : telaAtual === 'inicio' && isAdmin ? (
           <AdminDashboard
             restauranteId={restauranteSelecionado}
             restauranteNome={restauranteAtual?.nome}
@@ -472,10 +493,10 @@ function App() {
             onIrParaRestaurantes={() => setTelaAtual('restaurantes')}
             onIrParaUsuariosEstoque={() => {
               setError(null);
-              setTelaAtual('usuarios_estoque');
+              setTelaAtual('permissoes');
             }}
           />
-        ) : telaAtual === 'estoque' ? (
+        ) : telaAtual === 'estoque' && acessoEstoque ? (
           restaurantes.length === 0 ? (
             <div className="empty-state">
               <p>Nenhum restaurante disponível. Peça ao administrador para cadastrar um restaurante.</p>
@@ -483,14 +504,18 @@ function App() {
           ) : (
             <EstoqueShell
               restauranteId={restauranteSelecionado}
-              isAdmin={!!user?.is_admin}
+              isAdmin={isAdmin}
+              modulos={{
+                estoque: perms.estoque,
+                simplificado: perms.estoqueSimplificado
+              }}
               view={estoqueView}
               onViewChange={setEstoqueView}
               onMessage={setMsgEstoque}
               movimentoPeriodoPreset={estoqueMovPresetPeriodo}
             />
           )
-        ) : telaAtual === 'gastos' ? (
+        ) : telaAtual === 'gastos' && acessoFinanceiro ? (
           restaurantes.length === 0 ? (
             <div className="empty-state">
               <p>Nenhum restaurante cadastrado. Por favor, cadastre um restaurante primeiro.</p>
@@ -506,12 +531,16 @@ function App() {
               restauranteId={restauranteSelecionado}
             />
           )
-        ) : telaAtual === 'relatorios' ? (
+        ) : telaAtual === 'relatorios' && acessoFinanceiro ? (
           <Relatorios restauranteId={restauranteSelecionado} />
-        ) : telaAtual === 'usuarios_estoque' && isAdmin && !somenteEstoque ? (
-          <AdminUsuariosEstoque onError={(msg) => setError(msg)} />
-        ) : (
+        ) : telaAtual === 'permissoes' && isAdmin ? (
+          <AdminPermissoesUsuarios onError={(msg) => setError(msg)} />
+        ) : telaAtual === 'restaurantes' && acessoFinanceiro ? (
           <CadastroRestaurantes onUpdate={handleRestaurantesUpdated} />
+        ) : (
+          <div className="empty-state">
+            <p>Você não tem permissão para acessar esta área.</p>
+          </div>
         )}
       </main>
     </div>

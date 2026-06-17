@@ -7,6 +7,7 @@ import EstoqueVisaoGeral from './EstoqueVisaoGeral';
 import EstoqueCategorias from './EstoqueCategorias';
 import EstoqueProdutos from './EstoqueProdutos';
 import EstoqueMovimentacao from './EstoqueMovimentacao';
+import EstoqueLancamentoDiario from './EstoqueLancamentoDiario';
 import '../Estoque.css';
 
 function catalogoParaMovimentacao(cats: EstoqueCategoria[]) {
@@ -27,6 +28,7 @@ function catalogoParaMovimentacao(cats: EstoqueCategoria[]) {
 interface Props {
   restauranteId: number | null;
   isAdmin: boolean;
+  modulos: { estoque: boolean; simplificado: boolean };
   view: EstoqueView;
   onViewChange: (v: EstoqueView) => void;
   onMessage?: (msg: string | null) => void;
@@ -36,6 +38,7 @@ interface Props {
 const EstoqueShell: React.FC<Props> = ({
   restauranteId,
   isAdmin,
+  modulos,
   view,
   onViewChange,
   onMessage,
@@ -46,7 +49,7 @@ const EstoqueShell: React.FC<Props> = ({
   const catalogoMovimentacao = useMemo(() => catalogoParaMovimentacao(categorias), [categorias]);
 
   const carregar = useCallback(async () => {
-    if (!restauranteId) {
+    if (!restauranteId || !modulos.estoque) {
       setCategorias([]);
       setLoading(false);
       return;
@@ -64,7 +67,7 @@ const EstoqueShell: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  }, [restauranteId, onMessage]);
+  }, [restauranteId, modulos.estoque, onMessage]);
 
   useEffect(() => {
     carregar();
@@ -76,27 +79,52 @@ const EstoqueShell: React.FC<Props> = ({
     }
   }, [isAdmin, view, onViewChange]);
 
-  const effectiveView: EstoqueView = isAdmin
-    ? view
-    : view === 'movimentacao'
-      ? 'movimentacao'
-      : view === 'resumo'
-        ? 'resumo'
-        : 'visao';
+  useEffect(() => {
+    if (!modulos.estoque && view !== 'diario' && modulos.simplificado) {
+      onViewChange('diario');
+    } else if (!modulos.simplificado && view === 'diario' && modulos.estoque) {
+      onViewChange('resumo');
+    } else if (!modulos.estoque && !modulos.simplificado) {
+      onViewChange('resumo');
+    }
+  }, [modulos, view, onViewChange]);
+
+  const effectiveView: EstoqueView = (() => {
+    if (!modulos.estoque && modulos.simplificado) return 'diario';
+    if (view === 'diario' && !modulos.simplificado) {
+      return modulos.estoque ? 'resumo' : 'diario';
+    }
+    if (!modulos.estoque && view !== 'diario') return 'diario';
+    if (!isAdmin && (view === 'categorias' || view === 'produtos')) {
+      return modulos.estoque ? 'visao' : 'diario';
+    }
+    if (!isAdmin && view === 'movimentacao') return 'movimentacao';
+    if (!isAdmin && view === 'resumo') return 'resumo';
+    if (!isAdmin && modulos.estoque) {
+      return view === 'movimentacao' ? 'movimentacao' : view === 'resumo' ? 'resumo' : 'visao';
+    }
+    return view;
+  })();
 
   if (!restauranteId) {
     return <div className="estoque-empty">Selecione um restaurante.</div>;
   }
 
-  const subNavItems: { id: EstoqueView; label: string; adminOnly?: boolean }[] = [
-    { id: 'resumo', label: 'Visão geral' },
-    { id: 'visao', label: isAdmin ? 'Entrada e saída' : 'Lançar entrada e saída' },
-    { id: 'movimentacao', label: 'Movimentação' },
-    { id: 'categorias', label: 'Categorias', adminOnly: true },
-    { id: 'produtos', label: 'Produtos', adminOnly: true }
+  const subNavItems: { id: EstoqueView; label: string; adminOnly?: boolean; requer?: 'estoque' | 'simplificado' }[] = [
+    { id: 'resumo', label: 'Visão geral', requer: 'estoque' },
+    { id: 'diario', label: 'Lançamento diário', requer: 'simplificado' },
+    { id: 'visao', label: isAdmin ? 'Entrada e saída' : 'Lançar entrada e saída', requer: 'estoque' },
+    { id: 'movimentacao', label: 'Movimentação', requer: 'estoque' },
+    { id: 'categorias', label: 'Categorias', adminOnly: true, requer: 'estoque' },
+    { id: 'produtos', label: 'Produtos', adminOnly: true, requer: 'estoque' }
   ];
 
-  const visibleNav = subNavItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleNav = subNavItems.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.requer === 'estoque' && !modulos.estoque) return false;
+    if (item.requer === 'simplificado' && !modulos.simplificado) return false;
+    return true;
+  });
 
   return (
     <div className="estoque-shell">
@@ -116,7 +144,10 @@ const EstoqueShell: React.FC<Props> = ({
       </nav>
 
       <div className="estoque-shell-content" id="estoque-lancamento-panel">
-        {effectiveView === 'resumo' && (
+        {effectiveView === 'diario' && modulos.simplificado && (
+          <EstoqueLancamentoDiario restauranteId={restauranteId} onMessage={onMessage} />
+        )}
+        {effectiveView === 'resumo' && modulos.estoque && (
           <EstoqueResumo
             restauranteId={restauranteId}
             categorias={categorias}
@@ -127,7 +158,7 @@ const EstoqueShell: React.FC<Props> = ({
             isAdmin={isAdmin}
           />
         )}
-        {effectiveView === 'visao' && (
+        {effectiveView === 'visao' && modulos.estoque && (
           <EstoqueVisaoGeral
             categorias={categorias}
             loading={loading}
@@ -137,7 +168,10 @@ const EstoqueShell: React.FC<Props> = ({
             modoOperador={!isAdmin}
           />
         )}
-        {effectiveView === 'movimentacao' && (
+        {effectiveView === 'diario' && (
+          <EstoqueLancamentoDiario restauranteId={restauranteId} onMessage={onMessage} />
+        )}
+        {effectiveView === 'movimentacao' && modulos.estoque && (
           <EstoqueMovimentacao
             restauranteId={restauranteId}
             onMessage={onMessage}
@@ -146,7 +180,7 @@ const EstoqueShell: React.FC<Props> = ({
             onLancamentoFeito={carregar}
           />
         )}
-        {effectiveView === 'categorias' && isAdmin && (
+        {effectiveView === 'categorias' && isAdmin && modulos.estoque && (
           <EstoqueCategorias
             restauranteId={restauranteId}
             categorias={categorias}
@@ -155,7 +189,7 @@ const EstoqueShell: React.FC<Props> = ({
             onMessage={onMessage}
           />
         )}
-        {effectiveView === 'produtos' && isAdmin && (
+        {effectiveView === 'produtos' && isAdmin && modulos.estoque && (
           <EstoqueProdutos
             restauranteId={restauranteId}
             categorias={categorias}

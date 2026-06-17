@@ -18,11 +18,37 @@ const {
 const MAX_ESTOQUE_FOTO_URL_LEN = 400000;
 
 /** Usuários com somente_estoque=true não acessam rotas financeiras (gastos). */
-const requireFinanceiroAccess = (req, res, next) => {
-  if (req.user && req.user.somente_estoque === true) {
-    return res.status(403).json({ error: 'Acesso ao módulo financeiro não permitido para este perfil.' });
+const requireFinanceiroAccess = async (req, res, next) => {
+  const flags = await loadUserFlags(req.user.id);
+  if (!flags) {
+    return res.status(403).json({ error: 'Usuário inválido.' });
   }
-  next();
+  if (flags.is_admin || flags.modulo_financeiro) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Sem permissão para o módulo financeiro.' });
+};
+
+const requireModuloEstoque = async (req, res, next) => {
+  const flags = await loadUserFlags(req.user.id);
+  if (!flags) {
+    return res.status(403).json({ error: 'Usuário inválido.' });
+  }
+  if (flags.is_admin || flags.modulo_estoque) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Sem permissão para o módulo de estoque.' });
+};
+
+const requireModuloEstoqueSimplificado = async (req, res, next) => {
+  const flags = await loadUserFlags(req.user.id);
+  if (!flags) {
+    return res.status(403).json({ error: 'Usuário inválido.' });
+  }
+  if (flags.is_admin || flags.modulo_estoque_simplificado) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Sem permissão para o lançamento diário de estoque.' });
 };
 
 const requireAdmin = (req, res, next) => {
@@ -34,11 +60,75 @@ const requireAdmin = (req, res, next) => {
 
 /** Flags atuais do usuário (DB — não confiar só no JWT). */
 async function loadUserFlags(userId) {
-  const r = await pool.query(
-    'SELECT id, is_admin, COALESCE(somente_estoque, false) AS somente_estoque FROM usuarios WHERE id = $1',
-    [userId]
+  try {
+    const r = await pool.query(
+      `SELECT id, is_admin,
+        COALESCE(somente_estoque, false) AS somente_estoque,
+        COALESCE(modulo_financeiro, false) AS modulo_financeiro,
+        COALESCE(modulo_estoque, false) AS modulo_estoque,
+        COALESCE(modulo_estoque_simplificado, false) AS modulo_estoque_simplificado
+       FROM usuarios WHERE id = $1`,
+      [userId]
+    );
+    const row = r.rows[0];
+    if (!row) return null;
+    if (row.is_admin) {
+      return {
+        ...row,
+        modulo_financeiro: true,
+        modulo_estoque: true,
+        modulo_estoque_simplificado: true
+      };
+    }
+    return row;
+  } catch (err) {
+    if (err.code !== '42703') throw err;
+    const r = await pool.query(
+      'SELECT id, is_admin, COALESCE(somente_estoque, false) AS somente_estoque FROM usuarios WHERE id = $1',
+      [userId]
+    );
+    const row = r.rows[0];
+    if (!row) return null;
+    const legadoEstoque = !!row.somente_estoque && !row.is_admin;
+    return {
+      ...row,
+      modulo_financeiro: !!row.is_admin || !row.somente_estoque,
+      modulo_estoque: !!row.is_admin || legadoEstoque,
+      modulo_estoque_simplificado: !!row.is_admin
+    };
+  }
+}
+
+async function shapeUserForClient(userRow) {
+  const flags = await loadUserFlags(userRow.id);
+  if (!flags) return null;
+  let restauranteIds = [];
+  const restrito =
+    !flags.is_admin &&
+    !flags.modulo_financeiro &&
+    (flags.modulo_estoque || flags.modulo_estoque_simplificado);
+  if (restrito) {
+    restauranteIds = await restauranteIdsUsuarioEstoque(userRow.id);
+  }
+  return {
+    id: userRow.id,
+    username: userRow.username,
+    nome: userRow.nome,
+    is_admin: !!flags.is_admin,
+    modulo_financeiro: !!flags.modulo_financeiro,
+    modulo_estoque: !!flags.modulo_estoque,
+    modulo_estoque_simplificado: !!flags.modulo_estoque_simplificado,
+    restaurante_ids: restauranteIds,
+    somente_estoque: restrito
+  };
+}
+
+function usuarioRestaurantesRestritos(flags) {
+  return (
+    !flags.is_admin &&
+    !flags.modulo_financeiro &&
+    (flags.modulo_estoque || flags.modulo_estoque_simplificado)
   );
-  return r.rows[0] || null;
 }
 
 async function restauranteIdsUsuarioEstoque(userId) {
@@ -69,15 +159,19 @@ async function assertEstoqueAcessoRestaurante(req, res, restauranteId) {
     res.status(403).json({ error: 'Usuário inválido.' });
     return false;
   }
-  if (flags.is_admin || !flags.somente_estoque) {
+  if (flags.is_admin || flags.modulo_financeiro) {
     return true;
   }
-  const ok = await usuarioSomenteEstoquePodeRestaurante(req.user.id, rid);
-  if (!ok) {
-    res.status(403).json({ error: 'Sem permissão para acessar o estoque deste restaurante.' });
-    return false;
+  if (flags.modulo_estoque || flags.modulo_estoque_simplificado) {
+    const ok = await usuarioSomenteEstoquePodeRestaurante(req.user.id, rid);
+    if (!ok) {
+      res.status(403).json({ error: 'Sem permissão para acessar o estoque deste restaurante.' });
+      return false;
+    }
+    return true;
   }
-  return true;
+  res.status(403).json({ error: 'Sem permissão para acessar estoque.' });
+  return false;
 }
 
 function parseTipoMovimento(tipoRaw) {
@@ -110,6 +204,18 @@ function parseDateOnly(s) {
   if (!s || typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const d = new Date(`${s}T12:00:00`);
   return Number.isNaN(d.getTime()) ? null : s;
+}
+
+function parseDataEntradaLancamentoDiario(s) {
+  if (!s || typeof s !== 'string') return null;
+  const t = s.trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return parseDateOnly(t);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(t)) {
+    const [dia, mes, ano] = t.split('/');
+    return parseDateOnly(`${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`);
+  }
+  return null;
 }
 
 /** Segunda-feira 00:00 até domingo (fim inclusivo como data) da semana que contém `ref` */
@@ -220,38 +326,28 @@ async function loginHandler(req, res) {
     }
 
     console.log('Senha válida, gerando token...');
-    const somenteEstoque = !!user.somente_estoque;
+    const shaped = await shapeUserForClient(user);
+    if (!shaped) {
+      return res.status(500).json({ error: 'Erro ao carregar perfil do usuário.' });
+    }
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
-        is_admin: user.is_admin,
-        somente_estoque: somenteEstoque
+        is_admin: shaped.is_admin,
+        modulo_financeiro: shaped.modulo_financeiro,
+        modulo_estoque: shaped.modulo_estoque,
+        modulo_estoque_simplificado: shaped.modulo_estoque_simplificado,
+        somente_estoque: shaped.somente_estoque
       },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     console.log('Login bem-sucedido para:', username);
-    let restauranteIds = [];
-    if (somenteEstoque) {
-      const assoc = await pool.query(
-        'SELECT restaurante_id FROM usuario_restaurante_estoque WHERE usuario_id = $1 ORDER BY restaurante_id',
-        [user.id]
-      );
-      restauranteIds = assoc.rows.map((row) => row.restaurante_id);
-    }
-
     res.json({
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        nome: user.nome,
-        is_admin: user.is_admin,
-        somente_estoque: somenteEstoque,
-        restaurante_ids: restauranteIds
-      }
+      user: shaped
     });
   } catch (error) {
     console.error('Erro no login:', error);
@@ -269,19 +365,15 @@ app.post('/login', loginHandler);
 // Verify token
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, username, nome, is_admin, COALESCE(somente_estoque, false) AS somente_estoque FROM usuarios WHERE id = $1',
-      [req.user.id]
-    );
+    const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [req.user.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-    const row = result.rows[0];
-    let restauranteIds = [];
-    if (row.somente_estoque) {
-      restauranteIds = await restauranteIdsUsuarioEstoque(row.id);
+    const shaped = await shapeUserForClient(result.rows[0]);
+    if (!shaped) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-    res.json({ user: { ...row, restaurante_ids: restauranteIds } });
+    res.json({ user: shaped });
   } catch (error) {
     console.error('Erro ao verificar token:', error);
     res.status(500).json({ error: 'Erro ao verificar token' });
@@ -297,7 +389,7 @@ app.get('/api/restaurantes', authenticateToken, async (req, res) => {
     if (!flags) {
       return res.status(403).json({ error: 'Usuário inválido.' });
     }
-    if (flags.somente_estoque && !flags.is_admin) {
+    if (usuarioRestaurantesRestritos(flags)) {
       const result = await pool.query(
         `SELECT r.*
          FROM restaurantes r
@@ -324,7 +416,7 @@ app.get('/api/restaurantes/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const rid = parseInt(id, 10);
     const flags = await loadUserFlags(req.user.id);
-    if (flags && flags.somente_estoque && !flags.is_admin) {
+    if (flags && usuarioRestaurantesRestritos(flags)) {
       const ok = await usuarioSomenteEstoquePodeRestaurante(req.user.id, rid);
       if (!ok) {
         return res.status(403).json({ error: 'Sem acesso a este restaurante.' });
@@ -627,7 +719,7 @@ app.put('/api/gastos/bulk', authenticateToken, requireFinanceiroAccess, async (r
 // ========== Módulo Estoque ==========
 
 // Lista categorias + produtos agrupados (todos autenticados)
-app.get('/api/estoque/agrupado', authenticateToken, async (req, res) => {
+app.get('/api/estoque/agrupado', authenticateToken, requireModuloEstoque, async (req, res) => {
   try {
     const { restaurante_id } = req.query;
     if (!restaurante_id) {
@@ -829,7 +921,7 @@ app.post('/api/estoque/produtos', authenticateToken, requireAdmin, async (req, r
   }
 });
 
-app.put('/api/estoque/produtos/:id', authenticateToken, async (req, res) => {
+app.put('/api/estoque/produtos/:id', authenticateToken, requireModuloEstoque, async (req, res) => {
   const { id } = req.params;
   const body = req.body || {};
   const isAdmin = !!req.user.is_admin;
@@ -1213,7 +1305,7 @@ app.post('/api/estoque/produtos/replicar', authenticateToken, requireAdmin, asyn
 });
 
 // Lançamento explícito de entrada/saída (quantidade)
-app.post('/api/estoque/produtos/:id/movimentar', authenticateToken, async (req, res) => {
+app.post('/api/estoque/produtos/:id/movimentar', authenticateToken, requireModuloEstoque, async (req, res) => {
   const produtoId = parseInt(req.params.id, 10);
   if (Number.isNaN(produtoId)) {
     return res.status(400).json({ error: 'id de produto inválido' });
@@ -1274,7 +1366,7 @@ app.post('/api/estoque/produtos/:id/movimentar', authenticateToken, async (req, 
 });
 
 // Estorna um lançamento incorreto criando um movimento inverso
-app.post('/api/estoque/movimentos/:id/estornar', authenticateToken, async (req, res) => {
+app.post('/api/estoque/movimentos/:id/estornar', authenticateToken, requireModuloEstoque, async (req, res) => {
   const movId = parseInt(req.params.id, 10);
   if (Number.isNaN(movId)) {
     return res.status(400).json({ error: 'id de movimento inválido' });
@@ -1363,7 +1455,7 @@ app.post('/api/estoque/movimentos/:id/estornar', authenticateToken, async (req, 
 });
 
 // Resumo entradas/saídas por período (padrão: semana atual, seg–dom)
-app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) => {
+app.get('/api/estoque/movimentos/resumo', authenticateToken, requireModuloEstoque, async (req, res) => {
   try {
     const rid = parseInt(req.query.restaurante_id, 10);
     if (Number.isNaN(rid)) {
@@ -1469,7 +1561,7 @@ app.get('/api/estoque/movimentos/resumo', authenticateToken, async (req, res) =>
 });
 
 // Lista cronológica de lançamentos (últimos N)
-app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
+app.get('/api/estoque/movimentos', authenticateToken, requireModuloEstoque, async (req, res) => {
   try {
     const rid = parseInt(req.query.restaurante_id, 10);
     if (Number.isNaN(rid)) {
@@ -1522,7 +1614,324 @@ app.get('/api/estoque/movimentos', authenticateToken, async (req, res) => {
   }
 });
 
-// ========== Admin: usuários de estoque + vínculos com restaurantes ==========
+// ========== Lançamentos diários simplificados (texto livre) ==========
+
+app.get('/api/estoque/lancamentos-diarios', authenticateToken, requireModuloEstoqueSimplificado, async (req, res) => {
+  try {
+    const rid = parseInt(req.query.restaurante_id, 10);
+    if (Number.isNaN(rid)) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+    if (!pode) return;
+
+    let dataInicio = parseDateOnly(req.query.data_inicio);
+    let dataFim = parseDateOnly(req.query.data_fim);
+    if (!dataInicio || !dataFim) {
+      const w = periodoSemanaContendo();
+      dataInicio = w.data_inicio;
+      dataFim = w.data_fim;
+    }
+    if (dataInicio > dataFim) {
+      return res.status(400).json({ error: 'data_inicio não pode ser maior que data_fim' });
+    }
+
+    const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || 500, 1), 1000);
+    const result = await pool.query(
+      `SELECT id, restaurante_id, usuario_id, produto, data_lancamento, quantidade, created_at, updated_at
+       FROM estoque_lancamentos_diarios
+       WHERE restaurante_id = $1
+         AND (data_lancamento IS NULL OR (data_lancamento >= $2::date AND data_lancamento <= $3::date))
+       ORDER BY data_lancamento DESC NULLS LAST, id DESC
+       LIMIT $4`,
+      [rid, dataInicio, dataFim, limite]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.status(503).json({ error: 'Módulo de lançamento diário não instalado. Rode a migração 012.' });
+    }
+    console.error('Erro ao listar lançamentos diários:', error);
+    res.status(500).json({ error: 'Erro ao listar lançamentos diários' });
+  }
+});
+
+app.post('/api/estoque/lancamentos-diarios', authenticateToken, requireModuloEstoqueSimplificado, async (req, res) => {
+  try {
+    const { restaurante_id, produto, data_lancamento, quantidade } = req.body || {};
+    const rid = parseInt(restaurante_id, 10);
+    if (Number.isNaN(rid)) {
+      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    }
+    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+    if (!pode) return;
+
+    const prod = produto != null ? String(produto).trim() : '';
+    if (!prod) {
+      return res.status(400).json({ error: 'produto é obrigatório' });
+    }
+
+    let dataVal = null;
+    if (data_lancamento != null && String(data_lancamento).trim() !== '') {
+      dataVal = parseDataEntradaLancamentoDiario(String(data_lancamento));
+      if (!dataVal) {
+        return res.status(400).json({ error: 'data_lancamento inválida. Use AAAA-MM-DD ou DD/MM/AAAA.' });
+      }
+    }
+
+    const qtd = quantidade != null ? String(quantidade) : '';
+
+    const result = await pool.query(
+      `INSERT INTO estoque_lancamentos_diarios (restaurante_id, usuario_id, produto, data_lancamento, quantidade)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, restaurante_id, usuario_id, produto, data_lancamento, quantidade, created_at, updated_at`,
+      [rid, req.user.id, prod, dataVal, qtd]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.status(503).json({ error: 'Módulo de lançamento diário não instalado. Rode a migração 012.' });
+    }
+    console.error('Erro ao criar lançamento diário:', error);
+    res.status(500).json({ error: 'Erro ao criar lançamento diário' });
+  }
+});
+
+app.put('/api/estoque/lancamentos-diarios/:id', authenticateToken, requireModuloEstoqueSimplificado, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+
+    const existing = await pool.query('SELECT * FROM estoque_lancamentos_diarios WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Lançamento não encontrado' });
+    }
+
+    const row = existing.rows[0];
+    const pode = await assertEstoqueAcessoRestaurante(req, res, row.restaurante_id);
+    if (!pode) return;
+
+    const body = req.body || {};
+    const prod =
+      body.produto !== undefined && String(body.produto).trim() !== ''
+        ? String(body.produto).trim()
+        : row.produto;
+    if (!prod) {
+      return res.status(400).json({ error: 'produto é obrigatório' });
+    }
+
+    let dataVal = row.data_lancamento;
+    if (body.data_lancamento !== undefined) {
+      if (body.data_lancamento === null || String(body.data_lancamento).trim() === '') {
+        dataVal = null;
+      } else {
+        dataVal = parseDataEntradaLancamentoDiario(String(body.data_lancamento));
+        if (!dataVal) {
+          return res.status(400).json({ error: 'data_lancamento inválida. Use AAAA-MM-DD ou DD/MM/AAAA.' });
+        }
+      }
+    }
+
+    const qtd = body.quantidade !== undefined ? String(body.quantidade) : row.quantidade;
+
+    const result = await pool.query(
+      `UPDATE estoque_lancamentos_diarios
+       SET produto = $1, data_lancamento = $2, quantidade = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING id, restaurante_id, usuario_id, produto, data_lancamento, quantidade, created_at, updated_at`,
+      [prod, dataVal, qtd, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.status(503).json({ error: 'Módulo de lançamento diário não instalado. Rode a migração 012.' });
+    }
+    console.error('Erro ao atualizar lançamento diário:', error);
+    res.status(500).json({ error: 'Erro ao atualizar lançamento diário' });
+  }
+});
+
+app.delete('/api/estoque/lancamentos-diarios/:id', authenticateToken, requireModuloEstoqueSimplificado, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+
+    const existing = await pool.query('SELECT * FROM estoque_lancamentos_diarios WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Lançamento não encontrado' });
+    }
+
+    const pode = await assertEstoqueAcessoRestaurante(req, res, existing.rows[0].restaurante_id);
+    if (!pode) return;
+
+    await pool.query('DELETE FROM estoque_lancamentos_diarios WHERE id = $1', [id]);
+    res.json({ message: 'Lançamento removido', id });
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.status(503).json({ error: 'Módulo de lançamento diário não instalado. Rode a migração 012.' });
+    }
+    console.error('Erro ao remover lançamento diário:', error);
+    res.status(500).json({ error: 'Erro ao remover lançamento diário' });
+  }
+});
+
+// ========== Admin: permissões por módulo ==========
+
+async function listarRestauranteIdsUsuario(userId) {
+  const assoc = await pool.query(
+    'SELECT restaurante_id FROM usuario_restaurante_estoque WHERE usuario_id = $1 ORDER BY restaurante_id',
+    [userId]
+  );
+  return assoc.rows.map((row) => row.restaurante_id);
+}
+
+async function sincronizarRestaurantesUsuario(client, userId, restauranteIds) {
+  await client.query('DELETE FROM usuario_restaurante_estoque WHERE usuario_id = $1', [userId]);
+  const ids = Array.isArray(restauranteIds)
+    ? [...new Set(restauranteIds.map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x)))]
+    : [];
+  for (const rid of ids) {
+    const ex = await client.query('SELECT id FROM restaurantes WHERE id = $1 AND ativo = true', [rid]);
+    if (ex.rows.length === 0) continue;
+    await client.query(
+      `INSERT INTO usuario_restaurante_estoque (usuario_id, restaurante_id) VALUES ($1, $2)
+       ON CONFLICT (usuario_id, restaurante_id) DO NOTHING`,
+      [userId, rid]
+    );
+  }
+  return listarRestauranteIdsUsuario(userId);
+}
+
+app.get('/api/admin/usuarios-permissoes', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.nome, u.is_admin,
+        COALESCE(u.modulo_financeiro, false) AS modulo_financeiro,
+        COALESCE(u.modulo_estoque, false) AS modulo_estoque,
+        COALESCE(u.modulo_estoque_simplificado, false) AS modulo_estoque_simplificado
+       FROM usuarios u
+       ORDER BY u.is_admin DESC, u.nome ASC`
+    );
+    const rows = [];
+    for (const row of result.rows) {
+      const flags = row.is_admin
+        ? {
+            ...row,
+            modulo_financeiro: true,
+            modulo_estoque: true,
+            modulo_estoque_simplificado: true
+          }
+        : row;
+      const restaurante_ids = await listarRestauranteIdsUsuario(row.id);
+      rows.push({
+        id: flags.id,
+        username: flags.username,
+        nome: flags.nome,
+        is_admin: !!flags.is_admin,
+        modulo_financeiro: !!flags.modulo_financeiro,
+        modulo_estoque: !!flags.modulo_estoque,
+        modulo_estoque_simplificado: !!flags.modulo_estoque_simplificado,
+        restaurante_ids
+      });
+    }
+    res.json(rows);
+  } catch (error) {
+    if (error.code === '42703') {
+      return res.status(503).json({ error: 'Migração 013 (permissões por módulo) pendente.' });
+    }
+    console.error('Erro ao listar permissões:', error);
+    res.status(500).json({ error: 'Erro ao listar permissões de usuários' });
+  }
+});
+
+app.put('/api/admin/usuarios-permissoes/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+    const cur = await client.query('SELECT * FROM usuarios WHERE id = $1', [userId]);
+    if (cur.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    const usuario = cur.rows[0];
+    if (usuario.is_admin) {
+      return res.status(400).json({ error: 'Permissões de administrador não podem ser alteradas.' });
+    }
+
+    const body = req.body || {};
+    const moduloFinanceiro = body.modulo_financeiro === true;
+    const moduloEstoque = body.modulo_estoque === true;
+    const moduloEstoqueSimplificado = body.modulo_estoque_simplificado === true;
+
+    if (!moduloFinanceiro && !moduloEstoque && !moduloEstoqueSimplificado) {
+      return res.status(400).json({ error: 'Marque ao menos um módulo para o usuário.' });
+    }
+
+    const restrito = !moduloFinanceiro && (moduloEstoque || moduloEstoqueSimplificado);
+    let restauranteIds = [];
+    if (restrito) {
+      restauranteIds = Array.isArray(body.restaurante_ids)
+        ? body.restaurante_ids.map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x))
+        : await listarRestauranteIdsUsuario(userId);
+      if (restauranteIds.length === 0) {
+        return res.status(400).json({
+          error: 'Usuário só com módulos de estoque precisa de ao menos um restaurante liberado.'
+        });
+      }
+    }
+
+    const somenteEstoqueLegacy = restrito;
+
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE usuarios
+       SET modulo_financeiro = $1,
+           modulo_estoque = $2,
+           modulo_estoque_simplificado = $3,
+           somente_estoque = $4,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [moduloFinanceiro, moduloEstoque, moduloEstoqueSimplificado, somenteEstoqueLegacy, userId]
+    );
+
+    if (restrito) {
+      restauranteIds = await sincronizarRestaurantesUsuario(client, userId, restauranteIds);
+    } else {
+      await client.query('DELETE FROM usuario_restaurante_estoque WHERE usuario_id = $1', [userId]);
+      restauranteIds = [];
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      id: userId,
+      username: usuario.username,
+      nome: usuario.nome,
+      is_admin: false,
+      modulo_financeiro: moduloFinanceiro,
+      modulo_estoque: moduloEstoque,
+      modulo_estoque_simplificado: moduloEstoqueSimplificado,
+      restaurante_ids: restauranteIds
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error.code === '42703') {
+      return res.status(503).json({ error: 'Migração 013 (permissões por módulo) pendente.' });
+    }
+    console.error('Erro ao atualizar permissões:', error);
+    res.status(500).json({ error: 'Erro ao atualizar permissões' });
+  } finally {
+    client.release();
+  }
+});
+
+// ========== Admin: usuários de estoque + vínculos com restaurantes (legado) ==========
 
 app.get('/api/admin/usuarios-estoque', authenticateToken, requireAdmin, async (req, res) => {
   try {

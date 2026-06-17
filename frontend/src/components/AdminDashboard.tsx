@@ -17,7 +17,7 @@ interface Props {
   gastos: GastoRow[];
   onIrParaGastos: () => void;
   onIrParaRelatorios: () => void;
-  onIrParaEstoque: (view?: 'resumo' | 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
+  onIrParaEstoque: (view?: 'resumo' | 'diario' | 'visao' | 'categorias' | 'produtos' | 'movimentacao') => void;
   onIrParaMovimentacaoHoje?: () => void;
   onIrParaRestaurantes: () => void;
   onIrParaUsuariosEstoque?: () => void;
@@ -216,7 +216,7 @@ const AdminDashboard: React.FC<Props> = ({
         </button>
         {onIrParaUsuariosEstoque && (
           <button type="button" className="admin-dashboard-btn admin-dashboard-btn--ghost" onClick={onIrParaUsuariosEstoque}>
-            Usuários estoque
+            Usuários e permissões
           </button>
         )}
       </nav>

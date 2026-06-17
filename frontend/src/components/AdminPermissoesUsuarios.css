@@ -1,0 +1,154 @@
+.admin-perm {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.5rem 0 2rem;
+}
+
+.admin-perm-title {
+  font-size: 1.35rem;
+  margin: 0 0 0.35rem;
+  color: #0f172a;
+}
+
+.admin-perm-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.admin-perm-banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.admin-perm-banner--ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-perm-banner--err {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.admin-perm-grid-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+
+.admin-perm-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.admin-perm-grid th,
+.admin-perm-grid td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-perm-grid th {
+  background: #334155;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-perm-grid th.admin-perm-th-check {
+  text-align: center;
+  width: 110px;
+}
+
+.admin-perm-grid td.admin-perm-td-check {
+  text-align: center;
+}
+
+.admin-perm-grid tbody tr:hover {
+  background: #f8fafc;
+}
+
+.admin-perm-grid tbody tr.admin-perm-row--admin {
+  background: #f1f5f9;
+}
+
+.admin-perm-user-login {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.admin-perm-user-nome {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.admin-perm-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.admin-perm-check input {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+.admin-perm-check input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.admin-perm-rest-row td {
+  background: #fafafa;
+  padding-top: 0.35rem;
+  padding-bottom: 0.75rem;
+}
+
+.admin-perm-rest-fieldset {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.admin-perm-rest-legend {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  padding: 0 0.25rem;
+}
+
+.admin-perm-rest-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.admin-perm-rest-list label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.admin-perm-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #64748b;
+}

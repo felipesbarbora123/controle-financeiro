@@ -36,6 +36,16 @@ export interface ResumoMovimentosResponse {
   saldos: Array<{ produto_id: number; nome: string; saldo_atual: number }>;
 }
 
-export type EstoqueView = 'resumo' | 'visao' | 'categorias' | 'produtos' | 'movimentacao';
+export type EstoqueView = 'resumo' | 'visao' | 'diario' | 'categorias' | 'produtos' | 'movimentacao';
+
+export interface LancamentoDiario {
+  id: number;
+  restaurante_id: number;
+  produto: string;
+  data_lancamento: string | null;
+  quantidade: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export const UNIDADES_SUGERIDAS = ['un', 'kg', 'g', 'lt', 'ml', 'cx', 'fd', 'pct', 'dz'];
