@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import {
@@ -19,23 +19,46 @@ import './EstoqueLancamentoDiario.css';
 
 interface Props {
   restauranteId: number;
+  restaurantes: Array<{ id: number; nome: string }>;
   onMessage?: (msg: string | null) => void;
 }
 
-const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) => {
+const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, restaurantes, onMessage }) => {
   const [linhas, setLinhas] = useState<LinhaLancamentoDiario[]>([]);
+  const [filtroRestaurante, setFiltroRestaurante] = useState<string>('todos');
   const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState<number | null>(null);
   const [campoEditando, setCampoEditando] = useState<CampoLancamentoDiario | null>(null);
   const tabPressionadoRef = useRef(false);
+  const restaurantesOrdenados = useMemo(
+    () => [...restaurantes].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [restaurantes]
+  );
+  const restauranteNomePorId = useMemo(() => {
+    const map = new Map<number, string>();
+    restaurantesOrdenados.forEach((r) => map.set(r.id, r.nome));
+    return map;
+  }, [restaurantesOrdenados]);
+
+  const restaurantePadraoLinha = useCallback(() => {
+    if (filtroRestaurante !== 'todos') {
+      const rid = parseInt(filtroRestaurante, 10);
+      if (!Number.isNaN(rid)) return rid;
+    }
+    return restauranteId;
+  }, [filtroRestaurante, restauranteId]);
 
   const carregar = useCallback(
     async (focarNovaLinha = false) => {
       setLoading(true);
       onMessage?.(null);
       try {
+        const queryRestaurante =
+          filtroRestaurante === 'todos'
+            ? ''
+            : `?restaurante_id=${encodeURIComponent(filtroRestaurante)}`;
         const { data } = await axios.get<LancamentoDiarioApi[]>(
-          `${API_URL}/estoque/lancamentos-diarios?restaurante_id=${restauranteId}`
+          `${API_URL}/estoque/lancamentos-diarios${queryRestaurante}`
         );
         const ordenadas = (data || [])
           .map(apiParaLinha)
@@ -45,23 +68,23 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
             if (da !== db) return db.localeCompare(da);
             return (b.id || 0) - (a.id || 0);
           });
-        const comVazia = [...ordenadas, linhaVaziaLancamentoDiario()];
+        const comVazia = [...ordenadas, linhaVaziaLancamentoDiario(restaurantePadraoLinha())];
         setLinhas(comVazia);
         if (focarNovaLinha) {
           const idx = comVazia.length - 1;
           window.setTimeout(() => {
             setEditando(idx);
-            setCampoEditando('produto');
+            setCampoEditando('restaurante');
           }, 80);
         }
       } catch {
         onMessage?.('Não foi possível carregar os lançamentos diários.');
-        setLinhas([linhaVaziaLancamentoDiario()]);
+        setLinhas([linhaVaziaLancamentoDiario(restaurantePadraoLinha())]);
       } finally {
         setLoading(false);
       }
     },
-    [restauranteId, onMessage]
+    [filtroRestaurante, onMessage, restaurantePadraoLinha]
   );
 
   useEffect(() => {
@@ -109,7 +132,10 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
     setLinhas((prev) => {
       const next = [...prev];
       const linha = { ...next[linhaIndex] };
-      if (campo === 'produto') linha.produto = valor;
+      if (campo === 'restaurante') {
+        const rid = parseInt(valor, 10);
+        linha.restaurante_id = Number.isNaN(rid) ? null : rid;
+      } else if (campo === 'produto') linha.produto = valor;
       else if (campo === 'quantidade') linha.quantidade = valor;
       else if (campo === 'data') {
         linha.dataTexto = valor;
@@ -126,10 +152,15 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
     if (!linha) return;
     const produto = linha.produto.trim();
     if (!produto) return;
+    const rid = linha.restaurante_id || restaurantePadraoLinha();
+    if (!rid) {
+      onMessage?.('Selecione um restaurante para salvar o lançamento.');
+      return;
+    }
 
     const dataIso = parseDataParaBanco(linha.dataTexto ?? formatarDataExibicao(linha.data_lancamento));
     const body = {
-      restaurante_id: restauranteId,
+      restaurante_id: rid,
       produto,
       data_lancamento: dataIso,
       quantidade: linha.quantidade
@@ -221,6 +252,21 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
     <div className="estoque-modulo estoque-modulo--screen estoque-ld-wrap">
       <div className="estoque-ld-toolbar">
         <h2 className="estoque-screen-title">Lançamento diário</h2>
+        <label className="estoque-ld-filter">
+          <span>Restaurante</span>
+          <select
+            value={filtroRestaurante}
+            onChange={(e) => setFiltroRestaurante(e.target.value)}
+            className="estoque-ld-input"
+          >
+            <option value="todos">Todos</option>
+            {restaurantesOrdenados.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.nome}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" className="estoque-btn-refresh" onClick={() => carregar()}>
           Atualizar
         </button>
@@ -233,6 +279,7 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
 
       <div className="estoque-ld-grid" aria-label="Lançamentos diários">
         <div className="estoque-ld-header" role="row">
+          <div className="estoque-ld-cell">Restaurante</div>
           <div className="estoque-ld-cell">Produto</div>
           <div className="estoque-ld-cell">Data</div>
           <div className="estoque-ld-cell">Quantidade</div>
@@ -253,6 +300,36 @@ const EstoqueLancamentoDiario: React.FC<Props> = ({ restauranteId, onMessage }) 
                 className={`estoque-ld-row ${linha.id ? '' : 'estoque-ld-row--nova'}`}
                 role="row"
               >
+                <div className="estoque-ld-cell" data-label="Restaurante">
+                  {estaEditando(linhaIndex, 'restaurante') ? (
+                    <select
+                      className="estoque-ld-input"
+                      value={linha.restaurante_id ?? restaurantePadraoLinha() ?? ''}
+                      onChange={(e) => atualizarLinha(linhaIndex, 'restaurante', e.target.value)}
+                      onBlur={() => handleBlur(linhaIndex)}
+                      onKeyDown={(e) => handleKeyDown(e, linhaIndex, 'restaurante')}
+                      data-ld-linha={linhaIndex}
+                      data-ld-campo="restaurante"
+                      autoFocus
+                    >
+                      {restaurantesOrdenados.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.nome}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      className={`estoque-ld-cell-content ${!linha.restaurante_id ? 'estoque-ld-cell-content--placeholder' : ''}`}
+                      onClick={() => iniciarEdicao(linhaIndex, 'restaurante')}
+                    >
+                      {linha.restaurante_id
+                        ? restauranteNomePorId.get(linha.restaurante_id) || `Restaurante #${linha.restaurante_id}`
+                        : 'Clique para escolher'}
+                    </div>
+                  )}
+                </div>
+
                 <div className="estoque-ld-cell" data-label="Produto">
                   {estaEditando(linhaIndex, 'produto') ? (
                     <input

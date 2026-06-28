@@ -1,6 +1,6 @@
-export type CampoLancamentoDiario = 'produto' | 'data' | 'quantidade';
+export type CampoLancamentoDiario = 'restaurante' | 'produto' | 'data' | 'quantidade';
 
-export const CAMPOS_LANCAMENTO_DIARIO: CampoLancamentoDiario[] = ['produto', 'data', 'quantidade'];
+export const CAMPOS_LANCAMENTO_DIARIO: CampoLancamentoDiario[] = ['restaurante', 'produto', 'data', 'quantidade'];
 
 export interface LancamentoDiarioApi {
   id: number;
@@ -15,6 +15,7 @@ export interface LancamentoDiarioApi {
 
 export interface LinhaLancamentoDiario {
   id: number | null;
+  restaurante_id: number | null;
   produto: string;
   data_lancamento: string | null;
   quantidade: string;
@@ -36,10 +37,11 @@ export function hojeBr(): string {
   return `${d}/${m}/${y}`;
 }
 
-export function linhaVaziaLancamentoDiario(): LinhaLancamentoDiario {
+export function linhaVaziaLancamentoDiario(restauranteId?: number | null): LinhaLancamentoDiario {
   const hoje = hojeBr();
   return {
     id: null,
+    restaurante_id: restauranteId ?? null,
     produto: '',
     data_lancamento: hojeIso(),
     quantidade: '',
@@ -102,6 +104,7 @@ export function apiParaLinha(row: LancamentoDiarioApi): LinhaLancamentoDiario {
       : null;
   return {
     id: row.id,
+    restaurante_id: row.restaurante_id,
     produto: row.produto || '',
     data_lancamento: dataIso,
     quantidade: row.quantidade || '',

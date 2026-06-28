@@ -534,6 +534,7 @@ function App() {
           ) : (
             <EstoqueShell
               restauranteId={restauranteSelecionado}
+              restaurantes={restaurantes}
               isAdmin={isAdmin}
               modulos={{
                 estoque: perms.estoque,

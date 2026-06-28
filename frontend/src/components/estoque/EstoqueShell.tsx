@@ -27,6 +27,7 @@ function catalogoParaMovimentacao(cats: EstoqueCategoria[]) {
 
 interface Props {
   restauranteId: number | null;
+  restaurantes: Array<{ id: number; nome: string }>;
   isAdmin: boolean;
   modulos: { estoque: boolean; simplificado: boolean };
   view: EstoqueView;
@@ -37,6 +38,7 @@ interface Props {
 
 const EstoqueShell: React.FC<Props> = ({
   restauranteId,
+  restaurantes,
   isAdmin,
   modulos,
   view,
@@ -150,7 +152,11 @@ const EstoqueShell: React.FC<Props> = ({
 
       <div className="estoque-shell-content" id="estoque-lancamento-panel">
         {effectiveView === 'diario' && modulos.simplificado && (
-          <EstoqueLancamentoDiario restauranteId={restauranteId} onMessage={onMessage} />
+          <EstoqueLancamentoDiario
+            restauranteId={restauranteId}
+            restaurantes={restaurantes}
+            onMessage={onMessage}
+          />
         )}
         {effectiveView === 'resumo' && modulos.estoque && (
           <EstoqueResumo

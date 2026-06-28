@@ -16,6 +16,19 @@
   flex: 1 1 auto;
 }
 
+.estoque-ld-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.estoque-ld-filter .estoque-ld-input {
+  min-width: 180px;
+}
+
 .estoque-ld-hint {
   margin: 0 0 0.75rem;
   font-size: 0.88rem;
@@ -33,7 +46,7 @@
 
 .estoque-ld-header {
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) 150px minmax(90px, 0.8fr) 44px;
+  grid-template-columns: minmax(140px, 1.1fr) minmax(120px, 1.4fr) 150px minmax(90px, 0.8fr) 44px;
   background: #334155;
   color: #fff;
   font-weight: 600;
@@ -49,7 +62,7 @@
 
 .estoque-ld-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) 150px minmax(90px, 0.8fr) 44px;
+  grid-template-columns: minmax(140px, 1.1fr) minmax(120px, 1.4fr) 150px minmax(90px, 0.8fr) 44px;
   border-bottom: 1px solid #e2e8f0;
   background: #fff;
 }

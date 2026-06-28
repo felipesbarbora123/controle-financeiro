@@ -1618,12 +1618,16 @@ app.get('/api/estoque/movimentos', authenticateToken, requireModuloEstoque, asyn
 
 app.get('/api/estoque/lancamentos-diarios', authenticateToken, requireModuloEstoqueSimplificado, async (req, res) => {
   try {
-    const rid = parseInt(req.query.restaurante_id, 10);
-    if (Number.isNaN(rid)) {
-      return res.status(400).json({ error: 'restaurante_id é obrigatório' });
+    const restauranteParam = req.query.restaurante_id;
+    let rid = null;
+    if (restauranteParam !== undefined && restauranteParam !== null && restauranteParam !== '' && restauranteParam !== 'todos') {
+      rid = parseInt(restauranteParam, 10);
+      if (Number.isNaN(rid)) {
+        return res.status(400).json({ error: 'restaurante_id inválido' });
+      }
+      const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
+      if (!pode) return;
     }
-    const pode = await assertEstoqueAcessoRestaurante(req, res, rid);
-    if (!pode) return;
 
     let dataInicio = parseDateOnly(req.query.data_inicio);
     let dataFim = parseDateOnly(req.query.data_fim);
@@ -1637,14 +1641,35 @@ app.get('/api/estoque/lancamentos-diarios', authenticateToken, requireModuloEsto
     }
 
     const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || 500, 1), 1000);
+    const flags = await loadUserFlags(req.user.id);
+    if (!flags) {
+      return res.status(403).json({ error: 'Usuário inválido.' });
+    }
+
+    const params = [dataInicio, dataFim];
+    let filtroRestaurante = '';
+    if (rid) {
+      params.push(rid);
+      filtroRestaurante = `AND ld.restaurante_id = $${params.length}`;
+    } else if (usuarioRestaurantesRestritos(flags)) {
+      const restauranteIds = await restauranteIdsUsuarioEstoque(req.user.id);
+      if (restauranteIds.length === 0) {
+        return res.json([]);
+      }
+      params.push(restauranteIds);
+      filtroRestaurante = `AND ld.restaurante_id = ANY($${params.length}::int[])`;
+    }
+    params.push(limite);
+
     const result = await pool.query(
-      `SELECT id, restaurante_id, usuario_id, produto, data_lancamento, quantidade, created_at, updated_at
-       FROM estoque_lancamentos_diarios
-       WHERE restaurante_id = $1
-         AND (data_lancamento IS NULL OR (data_lancamento >= $2::date AND data_lancamento <= $3::date))
-       ORDER BY data_lancamento DESC NULLS LAST, id DESC
-       LIMIT $4`,
-      [rid, dataInicio, dataFim, limite]
+      `SELECT ld.id, ld.restaurante_id, ld.usuario_id, ld.produto, ld.data_lancamento, ld.quantidade,
+              ld.created_at, ld.updated_at
+       FROM estoque_lancamentos_diarios ld
+       WHERE (ld.data_lancamento IS NULL OR (ld.data_lancamento >= $1::date AND ld.data_lancamento <= $2::date))
+         ${filtroRestaurante}
+       ORDER BY ld.data_lancamento DESC NULLS LAST, ld.id DESC
+       LIMIT $${params.length}`,
+      params
     );
     res.json(result.rows);
   } catch (error) {
@@ -1714,6 +1739,18 @@ app.put('/api/estoque/lancamentos-diarios/:id', authenticateToken, requireModulo
     if (!pode) return;
 
     const body = req.body || {};
+    let rid = row.restaurante_id;
+    if (body.restaurante_id !== undefined) {
+      rid = parseInt(body.restaurante_id, 10);
+      if (Number.isNaN(rid)) {
+        return res.status(400).json({ error: 'restaurante_id inválido' });
+      }
+      if (rid !== row.restaurante_id) {
+        const podeDestino = await assertEstoqueAcessoRestaurante(req, res, rid);
+        if (!podeDestino) return;
+      }
+    }
+
     const prod =
       body.produto !== undefined && String(body.produto).trim() !== ''
         ? String(body.produto).trim()
@@ -1738,10 +1775,10 @@ app.put('/api/estoque/lancamentos-diarios/:id', authenticateToken, requireModulo
 
     const result = await pool.query(
       `UPDATE estoque_lancamentos_diarios
-       SET produto = $1, data_lancamento = $2, quantidade = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+       SET restaurante_id = $1, produto = $2, data_lancamento = $3, quantidade = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
        RETURNING id, restaurante_id, usuario_id, produto, data_lancamento, quantidade, created_at, updated_at`,
-      [prod, dataVal, qtd, id]
+      [rid, prod, dataVal, qtd, id]
     );
     res.json(result.rows[0]);
   } catch (error) {

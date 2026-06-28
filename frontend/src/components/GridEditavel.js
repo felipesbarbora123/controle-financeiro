@@ -25,29 +25,12 @@ const getDomingoSemanaAtual = () => {
   return domingo;
 };
 
-const getSegundaProximaSemana = () => {
-  const segunda = getSegundaSemanaAtual();
-  const proximaSegunda = new Date(segunda);
-  proximaSegunda.setDate(segunda.getDate() + 7);
-  proximaSegunda.setHours(0, 0, 0, 0);
-  return proximaSegunda;
-};
-
-const getDomingoProximaSemana = () => {
-  const proximaSegunda = getSegundaProximaSemana();
-  const proximoDomingo = new Date(proximaSegunda);
-  proximoDomingo.setDate(proximaSegunda.getDate() + 6); // Segunda + 6 dias = domingo
-  proximoDomingo.setHours(23, 59, 59, 999);
-  return proximoDomingo;
-};
-
-// Manter funções antigas para compatibilidade (deprecated)
-const getSabadoSemanaAtual = () => {
-  return getDomingoSemanaAtual();
-};
-
-const getSabadoProximaSemana = () => {
-  return getDomingoProximaSemana();
+const getInicioLancamentosFuturos = () => {
+  const domingo = getDomingoSemanaAtual();
+  const inicioFuturos = new Date(domingo);
+  inicioFuturos.setDate(domingo.getDate() + 1);
+  inicioFuturos.setHours(0, 0, 0, 0);
+  return inicioFuturos;
 };
 
 const formatarDataParaComparacao = (dataStr) => {
@@ -124,21 +107,19 @@ const pertenceSemanaAtual = (dataStr) => {
   return pertence;
 };
 
-const pertenceProximaSemana = (dataStr) => {
+const pertenceLancamentosFuturos = (dataStr) => {
   const data = formatarDataParaComparacao(dataStr);
   if (!data) {
     console.log('[PERTENCE_SEMANA] Data inválida:', dataStr);
     return false;
   }
   
-  const proximaSegunda = getSegundaProximaSemana();
-  const proximoDomingo = getDomingoProximaSemana();
+  const inicioFuturos = getInicioLancamentosFuturos();
   
-  const pertence = data >= proximaSegunda && data <= proximoDomingo;
-  console.log('[PERTENCE_SEMANA] Verificando se', dataStr, 'pertence à próxima semana:', {
+  const pertence = data >= inicioFuturos;
+  console.log('[PERTENCE_SEMANA] Verificando se', dataStr, 'pertence aos lançamentos futuros:', {
     data: data.toISOString().split('T')[0],
-    proximaSegunda: proximaSegunda.toISOString().split('T')[0],
-    proximoDomingo: proximoDomingo.toISOString().split('T')[0],
+    inicioFuturos: inicioFuturos.toISOString().split('T')[0],
     pertence
   });
   
@@ -152,6 +133,12 @@ const formatarPeriodoSemana = (segunda, domingo) => {
     return `${dia}/${mes}`;
   };
   return `${formatarData(segunda)} a ${formatarData(domingo)}`;
+};
+
+const formatarPeriodoFuturo = (inicio) => {
+  const dia = String(inicio.getDate()).padStart(2, '0');
+  const mes = String(inicio.getMonth() + 1).padStart(2, '0');
+  return `A partir de ${dia}/${mes}`;
 };
 
 const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
@@ -203,7 +190,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
       });
       
       const pertenceAtual = pertenceSemanaAtual(gasto.data);
-      const pertenceProxima = pertenceProximaSemana(gasto.data);
+      const pertenceProxima = pertenceLancamentosFuturos(gasto.data);
       
       console.log(`[SEPARAR_SEMANAS] Gasto ${index + 1} (ID: ${gasto.id}):`, {
         data: gasto.data,
@@ -221,7 +208,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         console.log(`[SEPARAR_SEMANAS] Gasto ${index + 1} adicionado à semana ATUAL`);
       } else if (pertenceProxima) {
         proximaSemana.push(gasto);
-        console.log(`[SEPARAR_SEMANAS] Gasto ${index + 1} adicionado à PRÓXIMA semana`);
+        console.log(`[SEPARAR_SEMANAS] Gasto ${index + 1} adicionado aos lançamentos futuros`);
       } else {
         console.log(`[SEPARAR_SEMANAS] ⚠️ Gasto ${index + 1} não pertence a nenhuma semana visível`);
       }
@@ -698,12 +685,12 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
     // Verificar se a data pertence à semana correta após salvar
     const dataSalva = dadosParaSalvar.data;
     const pertenceAtual = pertenceSemanaAtual(dataSalva);
-    const pertenceProxima = pertenceProximaSemana(dataSalva);
+    const pertenceProxima = pertenceLancamentosFuturos(dataSalva);
     
     console.log('[SALVAR] Verificação de semana:');
     console.log('  - Data salva:', dataSalva);
     console.log('  - Pertence à semana atual:', pertenceAtual);
-    console.log('  - Pertence à próxima semana:', pertenceProxima);
+    console.log('  - Pertence aos lançamentos futuros:', pertenceProxima);
     console.log('  - Tabela atual:', tabela);
     
     // Se a data não pertence à tabela atual, precisamos mover
@@ -1405,8 +1392,7 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
   // Calcular períodos das semanas (segunda a domingo)
   const segundaSemanaAtual = getSegundaSemanaAtual();
   const domingoSemanaAtual = getDomingoSemanaAtual();
-  const segundaProximaSemana = getSegundaProximaSemana();
-  const domingoProximaSemana = getDomingoProximaSemana();
+  const inicioLancamentosFuturos = getInicioLancamentosFuturos();
 
   // Função para formatar valor monetário
   const formatarValorMonetario = (valor) => {
@@ -1618,8 +1604,8 @@ const GridEditavel = ({ gastos, onSave, onDelete, restauranteId }) => {
         {renderizarTabela(
           linhasProximaSemana,
           'proxima',
-          'Próxima Semana',
-          formatarPeriodoSemana(segundaProximaSemana, domingoProximaSemana)
+          'Lançamentos Futuros',
+          formatarPeriodoFuturo(inicioLancamentosFuturos)
         )}
       </div>
     </div>
